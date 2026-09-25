@@ -143,10 +143,8 @@ type EndpointsBuilder(?groupName: string) =
 
     [<CustomOperation("filter")>]
     member _.Filter
-        (
-            state,
-            f: EndpointFilterInvocationContext -> (EndpointFilterInvocationContext -> ValueTask<obj>) -> Task<obj>
-        ) =
+        (state, f: EndpointFilterInvocationContext -> (EndpointFilterInvocationContext -> ValueTask<obj>) -> Task<obj>)
+        =
         let filter =
             { new IEndpointFilter with
                 member _.InvokeAsync(ctx, next) = ValueTask<obj>(f ctx next.Invoke) }

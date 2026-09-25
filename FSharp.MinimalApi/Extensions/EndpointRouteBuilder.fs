@@ -47,38 +47,28 @@ type IEndpointRouteBuilder with
         builder.MapGet(pattern, handler :> Delegate)
 
     member builder.MapGet
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapGet(pattern, handler :> Delegate)
 
     member builder.MapGet
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapGet(pattern, handler :> Delegate)
 
     member builder.MapGet
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapGet(pattern, handler :> Delegate)
 
     member builder.MapGet
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapGet(pattern, handler :> Delegate)
 
     member builder.MapGet
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapGet(pattern, handler :> Delegate)
 
     member builder.MapPost([<StringSyntax(route)>] pattern: string, handler: Func<_, _>) =
@@ -115,38 +105,28 @@ type IEndpointRouteBuilder with
         builder.MapPost(pattern, handler :> Delegate)
 
     member builder.MapPost
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPost(pattern, handler :> Delegate)
 
     member builder.MapPost
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPost(pattern, handler :> Delegate)
 
     member builder.MapPost
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPost(pattern, handler :> Delegate)
 
     member builder.MapPost
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPost(pattern, handler :> Delegate)
 
     member builder.MapPost
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPost(pattern, handler :> Delegate)
 
     member builder.MapPut([<StringSyntax(route)>] pattern: string, handler: Func<_, _>) =
@@ -183,38 +163,28 @@ type IEndpointRouteBuilder with
         builder.MapPut(pattern, handler :> Delegate)
 
     member builder.MapPut
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPut(pattern, handler :> Delegate)
 
     member builder.MapPut
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPut(pattern, handler :> Delegate)
 
     member builder.MapPut
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPut(pattern, handler :> Delegate)
 
     member builder.MapPut
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPut(pattern, handler :> Delegate)
 
     member builder.MapPut
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapPut(pattern, handler :> Delegate)
 
     member builder.MapDelete([<StringSyntax(route)>] pattern: string, handler: Func<_, _>) =
@@ -248,43 +218,31 @@ type IEndpointRouteBuilder with
         builder.MapDelete(pattern, handler :> Delegate)
 
     member builder.MapDelete
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapDelete(pattern, handler :> Delegate)
 
     member builder.MapDelete
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapDelete(pattern, handler :> Delegate)
 
     member builder.MapDelete
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapDelete(pattern, handler :> Delegate)
 
     member builder.MapDelete
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapDelete(pattern, handler :> Delegate)
 
     member builder.MapDelete
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapDelete(pattern, handler :> Delegate)
 
     member builder.MapDelete
-        (
-            [<StringSyntax(route)>] pattern: string,
-            handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>
-        ) =
+        ([<StringSyntax(route)>] pattern: string, handler: Func<_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _>)
+        =
         builder.MapDelete(pattern, handler :> Delegate)

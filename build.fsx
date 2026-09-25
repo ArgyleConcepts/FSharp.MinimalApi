@@ -11,7 +11,7 @@ initEnviroment ()
 
 help "Run dotnet clean in everty project"
 
-target "clean" (fun _ -> !! "**/bin" ++ "**/obj" |> Shell.cleanDirs)
+target "clean" (fun _ -> !!"**/bin" ++ "**/obj" |> Shell.cleanDirs)
 
 help "Run dotnet build in every project"
 
@@ -29,10 +29,7 @@ target "restore" (fun _ ->
 
 help "Run all tests"
 
-target "test" (fun ctx ->
-    !! "**/**.Tests*.*sproj"
-    |> printFiles ctx.TargetInfo.Name
-    |> Seq.iter dotnetTest)
+target "test" (fun ctx -> !!"**/**.Tests*.*sproj" |> printFiles ctx.TargetInfo.Name |> Seq.iter dotnetTest)
 
 help "Update all local tools"
 target "update-tools" (run updateLocalTools)

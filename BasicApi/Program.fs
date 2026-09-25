@@ -68,10 +68,10 @@ let routes =
 
         get "/even/{v}" produces<Ok<string>, BadRequest> (fun (req: {| v: int; logger: ILogger<_> |}) ->
             (if req.v % 2 = 0 then
-                 !! Ok("even number!")
+                 !!Ok("even number!")
              else
                  req.logger.LogInformation $"Odd number: {req.v}"
-                 !! BadRequest()))
+                 !!BadRequest()))
 
         get "/delay/{n}" produces<NoContent> (fun (req: {| n: int |}) ->
             async {
@@ -104,8 +104,8 @@ let routes =
                     let! res = req.db.Users.Where(fun x -> x.Id = UserId req.userId).TryFirstAsync()
 
                     match res with
-                    | Some user -> return !! Ok(user)
-                    | None -> return !! NotFound()
+                    | Some user -> return !!Ok(user)
+                    | None -> return !!NotFound()
                 })
 
             route "profile" {
@@ -117,16 +117,16 @@ let routes =
                     (fun (req: {| userInfo: NewUser; db: MyDbContext |}) ->
                         task {
                             match NewUser.parseUser req.userInfo with
-                            | Error err -> return !! ValidationProblem(err)
+                            | Error err -> return !!ValidationProblem(err)
                             | Ok newUser ->
                                 let! exists = req.db.Users.TryFirstAsync(fun x -> x.Email = newUser.Email)
 
                                 match exists with
-                                | Some _ -> return !! Conflict()
+                                | Some _ -> return !!Conflict()
                                 | None ->
                                     req.db.Users.add newUser
                                     do! req.db.saveChangesAsync ()
-                                    return !! Created($"/user/{newUser.Id.Value}", newUser)
+                                    return !!Created($"/user/{newUser.Id.Value}", newUser)
                         })
 
                 delete "/{userId}" produces<NoContent, NotFound> (fun (req: {| userId: Guid; db: MyDbContext |}) ->
@@ -134,11 +134,11 @@ let routes =
                         let! exists = req.db.Users.TryFirstAsync(fun x -> x.Id = UserId req.userId)
 
                         match exists with
-                        | None -> return !! NotFound()
+                        | None -> return !!NotFound()
                         | Some user ->
                             req.db.Users.remove user
                             do! req.db.saveChangesAsync ()
-                            return !! NoContent()
+                            return !!NoContent()
                     })
 
             }
@@ -167,10 +167,7 @@ let main args =
         )
     |> ignore
 
-    builder.Services
-        .AddOptions<MyCustomSettings>()
-        .BindConfiguration("MyCustomSettings")
-        .ValidateOnStart()
+    builder.Services.AddOptions<MyCustomSettings>().BindConfiguration("MyCustomSettings").ValidateOnStart()
     |> ignore
 
     let app = builder.Build()
