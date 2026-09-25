@@ -36,6 +36,7 @@
         <Compile Include="Extensions\DI.fs"/>
         <Compile Include="Extensions\EndpointRouteBuilder.fs"/>
         <Compile Include="Builder\Produces.fs"/>
+        <Compile Include="Builder\Results2.fs"/>
         <Compile Include="Builder\EndpointHandlerBuilder.fs"/>
         <Compile Include="Builder\EndpointsBuilder.fs"/>
         <Compile Include="Builder\Builders.fs"/>

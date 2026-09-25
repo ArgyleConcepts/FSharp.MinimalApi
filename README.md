@@ -124,6 +124,46 @@ let main args =
     0
 ```
 
+## Typed outcomes from named F# handlers
+
+For a named handler, annotate its concrete return type and map it directly. The result type gives ASP.NET Core the declared response metadata, and the compiler rejects any branch that returns an outcome outside that type.
+
+Before, an inline handler needed a `produces` witness and implicit conversions:
+
+```fsharp
+get "/users/{id}" produces<Ok<User>, NotFound> (fun (req: {| id: int |}) ->
+    task {
+        match findUser req.id with
+        | Some user -> return !!Ok user
+        | None -> return !!NotFound()
+    })
+```
+
+With a named handler, the return annotation supplies the two outcomes. `Results2.first` and `Results2.second` construct the corresponding ASP.NET Core `Results<_,_>` case without changing its type or serialization:
+
+```fsharp
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.HttpResults
+open FSharp.MinimalApi.Builder
+open type TypedResults
+
+let getUser (req: {| id: int |}) : Task<Results<Ok<User>, NotFound>> =
+    task {
+        match findUser req.id with
+        | Some user -> return Results2.first (Ok user)
+        | None -> return Results2.second (NotFound())
+    }
+
+let routes = endpoints { get "/users/{id}" getUser }
+```
+
+The same mapping works for synchronous and `Async` handlers with an annotated `Results<_,_>` return type. Keep `produces<...>` for inline handlers where the annotation improves inference, for handlers with more than two outcomes, or when keeping an existing declaration. A custom `IResult` can also return pre-serialized bytes unchanged. If it does not provide its own endpoint metadata, declare the response through the optional endpoint config argument:
+
+```fsharp
+get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, "application/json"))
+```
+
 ## Pull request validation
 
 [`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through the **FSharp.MinimalApi PR Validation** pipeline in the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release with warnings as errors, runs the F# analyzers, runs the solution tests, checks F# formatting with Fantomas, and verifies locally packed packages.
