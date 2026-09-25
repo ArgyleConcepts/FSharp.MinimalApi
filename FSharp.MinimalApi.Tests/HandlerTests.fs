@@ -171,6 +171,14 @@ let private valueTaskUnit (req: {| calls: Calls |}) : ValueTask<unit> =
   req.calls.Add "value task"
   ValueTask<unit>(())
 
+let private valueTaskUnitAsync (req: {| calls: Calls |}) : ValueTask<unit> =
+  ValueTask<unit>(
+    task {
+      do! Task.Yield()
+      req.calls.Add "value task async"
+    }
+  )
+
 let private valueTaskOutcome (req: {| id: int |}) : ValueTask<Results<Ok<int>, NotFound>> =
   let outcome: Results<Ok<int>, NotFound> =
     if req.id > 0 then !!(Ok req.id) else !!(NotFound())
@@ -186,6 +194,7 @@ let ``ValueTask handlers preserve typed metadata and unit responses`` () =
           get "/value-task/{id:int}" valueTaskHandler
           get "/value-task/no-params" (fun () -> ValueTask<string>("no params"))
           post "/value-task/unit" valueTaskUnit
+          post "/value-task/unit-async" valueTaskUnitAsync
           post "/value-task/unit-no-params" (fun () -> ValueTask<unit>(()))
           get "/value-task/typed-no-params" produces<Ok<int>> (fun () -> ValueTask<Ok<int>>(Ok 1))
           get "/value-task/outcome/{id}" produces<Ok<int>, NotFound> valueTaskOutcome
@@ -202,12 +211,14 @@ let ``ValueTask handlers preserve typed metadata and unit responses`` () =
     do! expectBody ok "no params" noParams
     let! unitResult = send app (request HttpMethod.Post "/value-task/unit")
     do! expectBody ok "" unitResult
+    let! asyncUnitResult = send app (request HttpMethod.Post "/value-task/unit-async")
+    do! expectBody ok "" asyncUnitResult
     let! unitNoParams = send app (request HttpMethod.Post "/value-task/unit-no-params")
     do! expectBody ok "" unitNoParams
     Assert.Equal<(int * Type) list>([ 200, typeof<int> ], producedBy (endpoint app "GET" "/value-task/typed-no-params"))
     let! typedNoParams = get app "/value-task/typed-no-params"
     do! expectBody ok "1" typedNoParams
-    Assert.Equal<string list>([ "value task" ], callsOf app)
+    Assert.Equal<string list>([ "value task"; "value task async" ], callsOf app)
 
     for verb in [ HttpMethod.Get; HttpMethod.Post; HttpMethod.Put; HttpMethod.Delete ] do
       Assert.Equal<(int * Type) list>(

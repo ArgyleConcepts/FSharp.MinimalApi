@@ -41,7 +41,10 @@ type HeaderBound =
   | HeaderBound of string
 
   static member BindAsync(context: HttpContext, _parameter: ParameterInfo) =
-    ValueTask<HeaderBound>(HeaderBound(context.Request.Headers["X-Item"].ToString()))
+    if context.Request.Headers.ContainsKey("X-Item") then
+      ValueTask<HeaderBound>(HeaderBound(context.Request.Headers["X-Item"].ToString()))
+    else
+      ValueTask<HeaderBound>(Unchecked.defaultof<HeaderBound>)
 
 type HeaderId =
   {
@@ -143,6 +146,8 @@ let ``custom TryParse and BindAsync are used inside a named F# parameter shape``
     valid.Headers.Add("X-Item", "header")
     let! response = send app valid
     do! expectBody ok "12:header" response
+    let! missingBound = get app "/custom/12"
+    let! _ = expect HttpStatusCode.BadRequest missingBound
     let! invalid = get app "/custom/not-an-id"
     let! _ = expect HttpStatusCode.BadRequest invalid
     let! negative = get app "/custom/-1"
@@ -155,6 +160,8 @@ let ``custom TryParse and BindAsync are used inside a named F# parameter shape``
     header.Headers.Add("X-Id", "14")
     let! headerResult = send app header
     do! expectBody ok "14" headerResult
+    let! missingHeader = get app "/custom-header"
+    let! _ = expect HttpStatusCode.BadRequest missingHeader
     ()
   }
 

@@ -229,6 +229,7 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.HttpResults
+open FSharp.MinimalApi.Builder
 open type TypedResults
 
 let readItem (req: {| id: int; cancellationToken: CancellationToken |}) : ValueTask<Ok<int>> =
