@@ -7,6 +7,7 @@ open System.Text.Json.Serialization
 open Json.Schema
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http.Json
+open Microsoft.AspNetCore.OpenApi
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Options
 open Xunit
@@ -44,6 +45,19 @@ type Renamed =
   | [<JsonName "first">] First
   | [<JsonName("val", Field = "value")>] Second of value: int
 
+type Coded =
+  | [<JsonName 1>] One
+  | [<JsonName true>] Yes
+
+type Wrap = Wrap of Payload
+
+type Point =
+  | Point of int * string * int
+  | Labeled of x: int * int
+  | Origin
+
+type UserId = UserId of int
+
 type Sample =
   {
     Name: string
@@ -72,6 +86,11 @@ type Sample =
     Maybe: Skippable<int>
     Outcome: Result<int, string>
     Anonymous: {| Inner: int option |}
+    Coded: Coded
+    Owner: Payload option
+    Wrapped: Wrap
+    Point: Point
+    Unique: Set<int> option
   }
 
 let samples =
@@ -100,6 +119,11 @@ let samples =
       Maybe = Include 5
       Outcome = Ok 1
       Anonymous = {| Inner = Some 1 |}
+      Coded = One
+      Owner = Some { Id = 2; Label = "owner" }
+      Wrapped = Wrap { Id = 3; Label = "wrapped" }
+      Point = Point(1, "a", 2)
+      Unique = Some(set [ 1 ])
     }
 
   [
@@ -117,8 +141,15 @@ let samples =
         Maybe = Skip
         Outcome = Error "e"
         Anonymous = {| Inner = None |}
+        Coded = Yes
+        Owner = None
+        Point = Origin
+        Unique = None
     }
-    { first with Value = Nothing }
+    { first with
+        Value = Nothing
+        Point = Labeled(1, 2)
+    }
   ]
 
 let encodings =
@@ -142,6 +173,7 @@ let encodings =
       JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionFieldNamingPolicy(JsonNamingPolicy.SnakeCaseLower)
       "Field names from types", JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionFieldNamesFromTypes()
       "Map as array of pairs", JsonFSharpOptions.Default().WithMapFormat(MapFormat.ArrayOfPairs)
+      "Map as object", JsonFSharpOptions.Default().WithMapFormat(MapFormat.Object)
     ]
 
 type Api =
@@ -296,4 +328,51 @@ let ``describes single-case unions as their wrapped value`` () =
     let! api = createApi (JsonFSharpOptions.Default())
     let email = (componentSchemas api)["Email"]
     Assert.Equal("""{"type":"string"}""", email.ToJsonString())
+  }
+
+[<Fact>]
+let ``describes maps keyed by other unions as arrays of pairs`` () =
+  task {
+    let sample = Map [ UserId 1, "one"; UserId 2, "two" ]
+    let! api = createApiFor (JsonFSharpOptions.Default()) sample
+    let json = JsonSerializer.Serialize(sample, api.Serializer)
+    let valid, details = validate (responseSchema api) json
+    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.StartsWith("[", json)
+
+    let keyedByCase = Map [ Origin, 1; Labeled(1, 2), 2 ]
+    let! api = createApiFor (JsonFSharpOptions.Default()) keyedByCase
+    let json = JsonSerializer.Serialize(keyedByCase, api.Serializer)
+    let valid, details = validate (responseSchema api) json
+    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.StartsWith("[", json)
+  }
+
+[<Fact>]
+let ``AddFSharp without options uses the default encoding`` () =
+  task {
+    let document (configure: OpenApiOptions -> unit) =
+      task {
+        use! app =
+          startWith
+            (fun services ->
+              services.ConfigureHttpJsonOptions(fun o ->
+                JsonFSharpOptions.Default().AddToJsonSerializerOptions o.SerializerOptions)
+              |> ignore
+
+              services.AddOpenApi(configure) |> ignore)
+            (fun app ->
+              app.MapOpenApi() |> ignore
+              app.MapGet("/sample", Func<Sample>(fun () -> samples.Head)) |> ignore)
+
+        return! app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
+      }
+
+    let! withDefaults = document (fun o -> o.AddFSharp() |> ignore)
+
+    let! explicitDefaults =
+      document (fun o -> o.AddFSharp(JsonFSharpOptions.Default()) |> ignore)
+
+    Assert.Equal(explicitDefaults, withDefaults)
+    Assert.Contains("\"Sample\"", withDefaults)
   }
