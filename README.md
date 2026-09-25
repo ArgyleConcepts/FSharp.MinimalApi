@@ -129,7 +129,7 @@ let main args =
 
 ## Pull request validation
 
-[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, and checks F# formatting with Fantomas.
+[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through [FSharp.MinimalApi PR Validation](https://dev.azure.com/ArgyleConceptsLLC/Argyle%20Converge/_build?definitionId=33) in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, and checks F# formatting with Fantomas.
 
 To reproduce the validation locally, run these commands from the repository root:
 
@@ -143,7 +143,7 @@ dotnet fantomas check .
 
 Maintainer setup:
 
-1. In Azure DevOps, create a YAML pipeline for `ArgyleConcepts/FSharp.MinimalApi`, select `develop` and `azure-pipelines.yml`, and authorize the existing **ArgyleConcepts** GitHub App service connection for the pipeline. The service connection must have access to this repository and permission to post PR checks; keep its credentials in Azure DevOps.
+1. The Azure pipeline uses the existing **ArgyleConcepts** GitHub App service connection and `azure-pipelines.yml`. Confirm that the connection has access to `ArgyleConcepts/FSharp.MinimalApi` and permission to post PR checks; keep its credentials in Azure DevOps. After this YAML is merged, set the pipeline's default branch to `develop`.
 2. Open a PR targeting `develop` and confirm Azure Pipelines starts automatically and posts a successful check. Changes to that PR should start another run.
 3. In the GitHub repository settings, protect `develop` and require the Azure Pipelines check observed on the PR. Configure it to require the current commit's check before merging. Verify that a failed formatting or test run blocks the PR, then restore the passing commit.
 
