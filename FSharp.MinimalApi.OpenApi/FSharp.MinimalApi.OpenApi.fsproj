@@ -1,12 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Library</OutputType>
         <IsPackable>true</IsPackable>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <Authors>Lucas Teles - lucas.teles@outlook.com</Authors>
         <Company/>
-        <Description>Better Swagger documentation for F# types</Description>
+        <Description>OpenAPI schemas for F# types with Microsoft.AspNetCore.OpenApi and FSharp.SystemTextJson</Description>
         <RepositoryType>GitHub</RepositoryType>
         <PackageProjectUrl>https://github.com/lucasteles/FSharp.MinimalApi</PackageProjectUrl>
         <RepositoryUrl>https://github.com/lucasteles/FSharp.MinimalApi</RepositoryUrl>
@@ -14,36 +16,29 @@
 
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <PackageTags>AspNet,Asp,fsharp,Minimal api,MinimalApi,Swagger,OpenApi,Json</PackageTags>
-        <DocumentationFile>bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
+        <PackageTags>AspNet,Asp,fsharp,Minimal api,MinimalApi,OpenApi,Json</PackageTags>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-    </PropertyGroup>
-
-    <PropertyGroup>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
+
     <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
-    <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
         <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
         <PackageReference Update="FSharp.Core" Version="7.0"/>
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0"/>
-        <PackageReference Include="FSharp.SystemTextJson" Version="1.2.42"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12"/>
+        <PackageReference Include="FSharp.SystemTextJson" Version="1.4.36"/>
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="Utils.fs"/>
-        <Compile Include="Filters.fs"/>
+        <Compile Include="FSharpShape.fs"/>
+        <Compile Include="SchemaTransformer.fs"/>
         <Compile Include="Extensions.fs"/>
     </ItemGroup>
-
 </Project>

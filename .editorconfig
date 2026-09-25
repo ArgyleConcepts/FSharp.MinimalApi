@@ -1,0 +1,5 @@
+root = true
+
+[*.{fs,fsi,fsx}]
+# Keep the formatting style this project used before Fantomas 7 changed the default.
+fsharp_multiline_bracket_style = cramped

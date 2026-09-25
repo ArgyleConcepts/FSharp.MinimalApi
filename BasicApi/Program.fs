@@ -12,11 +12,12 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open FSharp.MinimalApi
-open FSharp.MinimalApi.Swagger
+open FSharp.MinimalApi.OpenApi
 open FSharp.MinimalApi.Builder
 open Microsoft.Extensions.Options
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.HttpResults
+open Scalar.AspNetCore
 open type TypedResults
 
 let otherRoute =
@@ -68,10 +69,10 @@ let routes =
 
         get "/even/{v}" produces<Ok<string>, BadRequest> (fun (req: {| v: int; logger: ILogger<_> |}) ->
             (if req.v % 2 = 0 then
-                 !! Ok("even number!")
+                 !!Ok("even number!")
              else
                  req.logger.LogInformation $"Odd number: {req.v}"
-                 !! BadRequest()))
+                 !!BadRequest()))
 
         get "/delay/{n}" produces<NoContent> (fun (req: {| n: int |}) ->
             async {
@@ -104,8 +105,8 @@ let routes =
                     let! res = req.db.Users.Where(fun x -> x.Id = UserId req.userId).TryFirstAsync()
 
                     match res with
-                    | Some user -> return !! Ok(user)
-                    | None -> return !! NotFound()
+                    | Some user -> return !!Ok(user)
+                    | None -> return !!NotFound()
                 })
 
             route "profile" {
@@ -117,16 +118,16 @@ let routes =
                     (fun (req: {| userInfo: NewUser; db: MyDbContext |}) ->
                         task {
                             match NewUser.parseUser req.userInfo with
-                            | Error err -> return !! ValidationProblem(err)
+                            | Error err -> return !!ValidationProblem(err)
                             | Ok newUser ->
                                 let! exists = req.db.Users.TryFirstAsync(fun x -> x.Email = newUser.Email)
 
                                 match exists with
-                                | Some _ -> return !! Conflict()
+                                | Some _ -> return !!Conflict()
                                 | None ->
                                     req.db.Users.add newUser
                                     do! req.db.saveChangesAsync ()
-                                    return !! Created($"/user/{newUser.Id.Value}", newUser)
+                                    return !!Created($"/user/{newUser.Id.Value}", newUser)
                         })
 
                 delete "/{userId}" produces<NoContent, NotFound> (fun (req: {| userId: Guid; db: MyDbContext |}) ->
@@ -134,11 +135,11 @@ let routes =
                         let! exists = req.db.Users.TryFirstAsync(fun x -> x.Id = UserId req.userId)
 
                         match exists with
-                        | None -> return !! NotFound()
+                        | None -> return !!NotFound()
                         | Some user ->
                             req.db.Users.remove user
                             do! req.db.saveChangesAsync ()
-                            return !! NoContent()
+                            return !!NoContent()
                     })
 
             }
@@ -157,8 +158,7 @@ let main args =
     builder.Services
         .ConfigureHttpJsonOptions(fun c -> jsonFsharp.AddToJsonSerializerOptions c.SerializerOptions)
         .AddSingleton(jsonFsharp)
-        .AddEndpointsApiExplorer()
-        .AddSwaggerGen(fun o -> o.ConfigureFSharp())
+        .AddOpenApi(fun o -> o.AddFSharp jsonFsharp |> ignore)
         .AddTuples()
         .AddDbContext<MyDbContext>(
             (fun c -> c.UseInMemoryDatabase("basic_api") |> ignore),
@@ -167,14 +167,12 @@ let main args =
         )
     |> ignore
 
-    builder.Services
-        .AddOptions<MyCustomSettings>()
-        .BindConfiguration("MyCustomSettings")
-        .ValidateOnStart()
+    builder.Services.AddOptions<MyCustomSettings>().BindConfiguration("MyCustomSettings").ValidateOnStart()
     |> ignore
 
     let app = builder.Build()
-    app.UseSwagger().UseSwaggerUI() |> ignore
+    app.MapOpenApi() |> ignore
+    app.MapScalarApiReference() |> ignore
 
     app.MapGroup("api").WithTags("Root") |> routes.Apply |> ignore
 
