@@ -216,6 +216,35 @@ dotnet pack FSharp.MinimalApi.OpenApi/FSharp.MinimalApi.OpenApi.fsproj --configu
 
 The intended NuGet owner is an Argyle Concepts organization account. The Argyle packages have not been published. Before any release, review the two `.nupkg` and `.snupkg` files, confirm the version and source links, rerun the validation commands above, set up organization ownership and publishing credentials outside this repository, and make a separate release decision. The PR pipeline has no publishing step or credentials.
 
+## Modern endpoint mappings and policies
+
+`patch` maps HTTP PATCH through ASP.NET Core's `MapPatch`. `methods` accepts a list of method names for HEAD, OPTIONS, or less common verbs through `MapMethods`. Both accept ordinary F# handlers, optional `produces<...>` declarations, and the same endpoint config callback as `get`, `post`, `put`, and `delete`. They work inside nested route groups; the generated OpenAPI document includes PATCH response metadata.
+
+```fsharp
+let routes =
+    endpoints {
+        route "api" {
+            requireAuthorization "members"
+            tags "Items"
+
+            patch "/items/{id}" updateItem (fun (b: RouteHandlerBuilder) ->
+                b.WithName("update-item").WithSummary("Update an item"))
+
+            methods "/items/{id}" [ "HEAD"; "OPTIONS" ] inspectItem
+        }
+    }
+```
+
+Use the group operations `requireAuthorization`, `filter`, `rateLimit "policy-name"`, and `outputCache "policy-name"` for shared behavior. The `summary` group operation gives every endpoint in the group the same default OpenAPI summary; an endpoint's own `WithSummary` overrides it. Use `tags` to group operations in OpenAPI. Register ASP.NET Core's rate limiting and output caching services and middleware in the application before using the last two. For one endpoint, use the optional callback with `RouteHandlerBuilder` methods such as `WithName`, `WithSummary`, `RequireRateLimiting`, `CacheOutput`, and `AddEndpointFilter`. `set` gives direct access to `RouteGroupBuilder` for other framework features. This keeps policy configuration in ASP.NET Core rather than duplicating it in the F# library. The [BasicApi sample](BasicApi/Program.fs) has a PATCH route in a filtered group and a per-endpoint name and summary.
+
+.NET 10 Minimal API validation is a separate application choice. Add a `Microsoft.Extensions.Validation` reference and call `builder.Services.AddValidation()` in an application assembly that supports its validation source generator. Once enabled, it may change invalid-input responses to framework-generated 400 bodies. For a route whose existing 400 bytes must remain unchanged, call `DisableValidation()` in its endpoint config callback; for an entire group, use `set (fun g -> g.DisableValidation())` in that group's `endpoints` builder. This library does not enable validation implicitly.
+
+```fsharp
+patch "/legacy/{id}" legacyHandler (fun (b: RouteHandlerBuilder) -> b.DisableValidation())
+```
+
+The validation generator must discover the endpoint's model in the assembly where `AddValidation` is called. In a .NET 10 F#-only smoke app with `Microsoft.Extensions.Validation` 10.0.12, `AddValidation()` did **not** enforce `[<Required>]` on an F# record: an empty JSON object returned 200 rather than a validation 400. Test validation with your own host and DTOs before relying on it. The fork's binding and response behavior stays unchanged without that explicit setup.
+
 ## OpenAPI
 
 `FSharp.MinimalApi.OpenApi` makes [Microsoft.AspNetCore.OpenApi](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/overview) describe F# types the way [FSharp.SystemTextJson](https://github.com/Tarmil/FSharp.SystemTextJson) serializes them. Without it, records, unions, options and F# collections appear as empty schemas, because FSharp.SystemTextJson's converters hide their structure from the generator.
