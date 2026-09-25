@@ -57,7 +57,10 @@ module Email =
         let errors =
             [| if String.IsNullOrWhiteSpace emailStr then
                    "Empty email"
-               elif not (emailStr.Contains "@") then
+               if
+                   emailStr = ""
+                   || (not (String.IsNullOrEmpty emailStr) && not (emailStr.Contains "@"))
+               then
                    "Invalid email" |]
 
         if errors |> Array.isEmpty then
@@ -69,7 +72,7 @@ module UserName =
     let errors (name: string) =
         [| if String.IsNullOrWhiteSpace name then
                "Empty name"
-           elif name.Length < 3 then
+           if name = "" || (not (String.IsNullOrEmpty name) && name.Length < 3) then
                "Short name" |]
 
 module NewUser =
