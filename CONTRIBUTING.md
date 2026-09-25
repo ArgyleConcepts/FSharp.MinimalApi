@@ -47,7 +47,7 @@ For behavior changes, add a regression test that demonstrates the problem or new
 
 Push your branch to your fork and open a PR against **ArgyleConcepts/FSharp.MinimalApi:develop**. Describe the problem, the resulting behavior, and the validation performed. Link related public issues and call out breaking changes. Draft PRs are welcome for early feedback.
 
-The branch must be up to date, the **FSharp.MinimalApi PR Validation** check must pass, and review conversations must be resolved before merging. Reviews are encouraged; a second maintainer's approval is not mandatory. Maintainers may request changes before merging.
+The branch must be up to date, the **FSharp.MinimalApi PR Validation** check must pass, and review conversations must be resolved before merging. Approval from the designated code owner is required; there is no additional numeric reviewer quota. Ownership is defined in [.github/CODEOWNERS](.github/CODEOWNERS). Maintainers may request changes before merging.
 
 Fork PRs may wait for a maintainer to inspect the changes and authorize Azure validation. Contributors do not need Azure credentials. If validation does not start, mention it in the PR; maintainers should follow the [maintainer guide](docs/MAINTAINING.md).
 

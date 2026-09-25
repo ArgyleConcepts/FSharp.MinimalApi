@@ -4,11 +4,17 @@
 
 - `develop` is the default branch and normal PR target.
 - `master` is retained for release preparation. Promote reviewed changes through a PR; merging does not publish packages.
-- Both branches require PRs and resolved review conversations, disallow force pushes and deletion, and apply protections to administrators. A second approving review is encouraged but not required.
+- Both branches require PRs and resolved review conversations, disallow force pushes and deletion, and apply protections to administrators. Code-owner approval is required, with no additional numeric reviewer quota.
 - Both branches require the **FSharp.MinimalApi PR Validation** check from the Azure Pipelines GitHub App (app ID `9426`) with an up-to-date branch.
 - The first promotion to `master` must include the updated `azure-pipelines.yml` from this setup so its PR triggers cover `master`. Until then, its historical YAML cannot satisfy the required check; keep normal contributions targeted at `develop`.
 
 Keep merge commits available for promotion between long-lived branches. Squash or merge focused contribution PRs as appropriate. Do not delete `develop` after a promotion. Remove obsolete topic branches after verifying their work is merged and no open PR depends on them.
+
+## Code ownership
+
+[.github/CODEOWNERS](../.github/CODEOWNERS) assigns all files, including the ownership policy itself, to `@david-cyman-argyle`. Both protected branches enable required code-owner reviews with the generic approval count set to zero. GitHub reads ownership from the PR's base branch: merge this setup into `develop` and include it in the first promotion to `master` to activate ownership on each branch.
+
+GitHub does not allow PR authors to approve their own PRs. With a single code owner and protections enforced for admins, David-authored PRs need another eligible code owner or a deliberate policy change before they can merge. Do not silently bypass the policy or add another owner without agreement.
 
 ## Access
 
