@@ -126,3 +126,36 @@ let main args =
     app.Run()
     0
 ```
+
+## OpenAPI
+
+`FSharp.MinimalApi.OpenApi` makes [Microsoft.AspNetCore.OpenApi](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/overview) describe F# types the way [FSharp.SystemTextJson](https://github.com/Tarmil/FSharp.SystemTextJson) serializes them. Without it, records, unions, options and F# collections appear as empty schemas, because FSharp.SystemTextJson's converters hide their structure from the generator.
+
+```ps
+$ dotnet add package FSharp.MinimalApi.OpenApi
+```
+
+Pass the same `JsonFSharpOptions` you use for serialization:
+
+```fsharp
+open System.Text.Json.Serialization
+open FSharp.MinimalApi.OpenApi
+
+let jsonFSharp = JsonFSharpOptions.Default()
+
+builder.Services
+    .ConfigureHttpJsonOptions(fun o -> jsonFSharp.AddToJsonSerializerOptions o.SerializerOptions)
+    .AddOpenApi(fun o -> o.AddFSharp jsonFSharp |> ignore)
+|> ignore
+
+app.MapOpenApi() |> ignore
+```
+
+What it describes:
+
+- **Records and anonymous records** as objects. Option, voption and `Skippable` fields are optional; `JsonName`, `JsonPropertyName` and `JsonIgnore` are respected.
+- **Unions** following the configured `JsonUnionEncoding`: adjacent, external or internal tag, untagged, named fields, unwrapped fieldless tags, single-field cases, record cases and single-case unions, plus `JsonName` on cases and tag and field naming policies.
+- **Options and voptions** inline as nullable values; **lists, sets, arrays, maps and tuples** inline as JSON arrays and objects.
+- **Recursive types** through named components.
+
+Not supported: per-type overrides (`JsonFSharpConverter` attributes or `WithOverrides`) and `IncludeRecordProperties`.

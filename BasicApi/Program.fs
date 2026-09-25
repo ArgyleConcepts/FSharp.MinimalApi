@@ -12,7 +12,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open FSharp.MinimalApi
-open FSharp.MinimalApi.Swagger
+open FSharp.MinimalApi.OpenApi
 open FSharp.MinimalApi.Builder
 open Microsoft.Extensions.Options
 open Microsoft.AspNetCore.Http
@@ -157,8 +157,7 @@ let main args =
     builder.Services
         .ConfigureHttpJsonOptions(fun c -> jsonFsharp.AddToJsonSerializerOptions c.SerializerOptions)
         .AddSingleton(jsonFsharp)
-        .AddEndpointsApiExplorer()
-        .AddSwaggerGen(fun o -> o.ConfigureFSharp())
+        .AddOpenApi(fun o -> o.AddFSharp jsonFsharp |> ignore)
         .AddTuples()
         .AddDbContext<MyDbContext>(
             (fun c -> c.UseInMemoryDatabase("basic_api") |> ignore),
@@ -171,7 +170,7 @@ let main args =
     |> ignore
 
     let app = builder.Build()
-    app.UseSwagger().UseSwaggerUI() |> ignore
+    app.MapOpenApi() |> ignore
 
     app.MapGroup("api").WithTags("Root") |> routes.Apply |> ignore
 
