@@ -38,6 +38,7 @@
 
     <ItemGroup>
         <Compile Include="FSharpShape.fs"/>
+        <Compile Include="JsonConfiguration.fs"/>
         <Compile Include="SchemaTransformer.fs"/>
         <Compile Include="Extensions.fs"/>
     </ItemGroup>
