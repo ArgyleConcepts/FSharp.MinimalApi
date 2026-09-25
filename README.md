@@ -143,6 +143,7 @@ With a named handler, the return annotation supplies the two outcomes. `Results2
 
 ```fsharp
 open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.HttpResults
 open FSharp.MinimalApi.Builder
@@ -161,7 +162,7 @@ let routes = endpoints { get "/users/{id}" getUser }
 The same mapping works for synchronous and `Async` handlers with an annotated `Results<_,_>` return type. Keep `produces<...>` for inline handlers where the annotation improves inference, for handlers with more than two outcomes, or when keeping an existing declaration. A custom `IResult` can also return pre-serialized bytes unchanged. If it does not provide its own endpoint metadata, declare the response through the optional endpoint config argument:
 
 ```fsharp
-get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, "application/json"))
+get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, typeof<obj>, "application/json"))
 ```
 
 ## Pull request validation
