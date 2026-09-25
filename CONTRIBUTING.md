@@ -8,6 +8,14 @@ Search the [issues](https://github.com/ArgyleConcepts/FSharp.MinimalApi/issues) 
 
 Do not include credentials, personal data, or private application code. Follow [SECURITY.md](SECURITY.md) for vulnerabilities and our [Code of Conduct](CODE_OF_CONDUCT.md) in all project spaces.
 
+## AI-assisted contributions
+
+AI-assisted contributions are welcome. You are responsible for everything you submit, whether you wrote it yourself or used an AI tool.
+
+Before submitting, read and understand the entire change, review it for correctness, and run the relevant checks. Be prepared to explain how it works, why the approach fits the project, and what the tests demonstrate. Verify generated claims, examples, and references, and make sure you have the right to contribute any included material under the project's license.
+
+Only submit changes you understand and can support through review. You remain responsible for answering reviewer questions and addressing problems in your contribution; AI assistance does not transfer that responsibility to the tool or the maintainers.
+
 ## Set up locally
 
 Install Git and the .NET 10 SDK selected by [global.json](global.json). Bash and Python 3 are also needed for package verification; on Windows, use Git Bash or WSL for that script.
