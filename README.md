@@ -126,7 +126,7 @@ let main args =
 
 ## Pull request validation
 
-[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through [FSharp.MinimalApi PR Validation](https://dev.azure.com/ArgyleConceptsLLC/Argyle%20Converge/_build?definitionId=33) in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, checks F# formatting with Fantomas, and verifies locally packed packages.
+[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` and release promotions into `master` through [FSharp.MinimalApi PR Validation](https://dev.azure.com/ArgyleConceptsLLC/Argyle%20Converge/_build?definitionId=33) in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, checks F# formatting with Fantomas, and verifies locally packed packages.
 
 To reproduce the validation locally, run these commands from the repository root:
 
@@ -139,11 +139,7 @@ dotnet fantomas check .
 bash eng/verify-packages.sh
 ```
 
-Maintainer setup:
-
-1. The Azure pipeline uses the existing **ArgyleConcepts** GitHub App service connection and `azure-pipelines.yml`. Confirm that the connection has access to `ArgyleConcepts/FSharp.MinimalApi` and permission to post PR checks; keep its credentials in Azure DevOps. After this YAML is merged, set the pipeline's default branch to `develop`.
-2. Open a PR targeting `develop` and confirm Azure Pipelines starts automatically and posts a successful check. Changes to that PR should start another run.
-3. In the GitHub repository settings, protect `develop` and require the **FSharp.MinimalApi PR Validation** check from Azure Pipelines. Require the branch to be up to date before merging. A failed formatting or test run must block the PR.
+See [Contributing](CONTRIBUTING.md) for the fork and pull request workflow, and the [maintainer guide](docs/MAINTAINING.md) for branch protections, access, and CI administration.
 
 Package publishing remains a separate release decision.
 
@@ -202,3 +198,9 @@ $ dotnet test
 ```
 
 `./fake.sh test` also collects coverage and fails when a library assembly drops below 90% line coverage. `./fake.sh lint` checks formatting.
+
+## Contributing and support
+
+Bug reports, documentation improvements, tests, and feature proposals are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then open an [issue](https://github.com/ArgyleConcepts/FSharp.MinimalApi/issues) or a pull request against `develop`. You do not need access to our internal issue tracker or Azure DevOps organization to contribute.
+
+Please follow our [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately using the process in [SECURITY.md](SECURITY.md). This project is distributed under the [MIT license](LICENSE).
