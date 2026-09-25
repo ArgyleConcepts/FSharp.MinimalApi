@@ -35,10 +35,8 @@ public static class AsParameters
         FSharpFunc<TParam, Task<TResult>> requestDelegate) =>
         typeof(TParam) == typeof(Unit)
             ? typeof(TResult) == typeof(Unit)
-                ? Task ([AsParameters] TParam parameters) =>
-                requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
-                : Task<TResult> ([AsParameters] TParam parameters) =>
-                requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
+                ? Task () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
+                : Task<TResult> () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
             : typeof(TResult) == typeof(Unit)
                 ? Task ([AsParameters] TParam parameters) => requestDelegate.Invoke(parameters)
                 : Task<TResult> ([AsParameters] TParam parameters) => requestDelegate
@@ -51,12 +49,11 @@ public static class AsParameters
         FSharpFunc<TParam, FSharpAsync<TResult>> requestDelegate) =>
         typeof(TParam) == typeof(Unit)
             ? typeof(TResult) == typeof(Unit)
-                ? Task ([AsParameters] TParam parameters, CancellationToken cancellationToken) =>
+                ? Task (CancellationToken cancellationToken) =>
                 FSharpAsync.StartImmediateAsTask(
                     requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>()),
                     cancellationToken)
-                : Task<TResult> ([AsParameters] TParam parameters,
-                        CancellationToken cancellationToken) =>
+                : Task<TResult> (CancellationToken cancellationToken) =>
                     FSharpAsync.StartImmediateAsTask(
                         requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>()),
                         cancellationToken)
@@ -69,9 +66,9 @@ public static class AsParameters
                 FSharpAsync.StartImmediateAsTask(requestDelegate.Invoke(parameters),
                     cancellationToken);
 
+    // A plain Task has no result to unwrap; the delegate returns it as is and ASP.NET awaits it.
     static bool IsTask<T>() =>
-        typeof(T) == typeof(Task) ||
-        (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Task<>));
+        typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Task<>);
 
     static bool IsAsync<T>() =>
         (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(FSharpAsync<>));
