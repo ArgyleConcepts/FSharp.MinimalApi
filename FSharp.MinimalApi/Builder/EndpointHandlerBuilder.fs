@@ -55,6 +55,29 @@ type RouterBaseBuilder<'state>() =
             r
         |> this.Append state
 
+    member this.patch
+        (state: 'state)
+        (route: string)
+        (f: Delegate)
+        (config: (RouteHandlerBuilder -> RouteHandlerBuilder) option)
+        =
+        fun (r: IEndpointRouteBuilder) ->
+            r.MapPatch(route, f) |> Option.defaultValue id config |> ignore
+            r
+        |> this.Append state
+
+    member this.methods
+        (state: 'state)
+        (route: string)
+        (httpMethods: string seq)
+        (f: Delegate)
+        (config: (RouteHandlerBuilder -> RouteHandlerBuilder) option)
+        =
+        fun (r: IEndpointRouteBuilder) ->
+            r.MapMethods(route, httpMethods, f) |> Option.defaultValue id config |> ignore
+            r
+        |> this.Append state
+
 
     //****************************************************************************************************
     // Basic Maps
@@ -90,6 +113,23 @@ type RouterBaseBuilder<'state>() =
     [<CustomOperation(HttpMethodName.Delete)>]
     member this.MapDelete(s, route, f: 'p -> 'r, ?config) =
         this.delete s route (AsParameters.Of f) config
+
+    // MapPatch
+    [<CustomOperation(HttpMethodName.Patch)>]
+    member this.MapPatch(s, route, f: Delegate, ?config) = this.patch s route f config
+
+    [<CustomOperation(HttpMethodName.Patch)>]
+    member this.MapPatch(s, route, f: 'p -> 'r, ?config) =
+        this.patch s route (AsParameters.Of f) config
+
+    // MapMethods
+    [<CustomOperation(HttpMethodName.Methods)>]
+    member this.MapMethods(s, route, httpMethods: string seq, f: Delegate, ?config) =
+        this.methods s route httpMethods f config
+
+    [<CustomOperation(HttpMethodName.Methods)>]
+    member this.MapMethods(s, route, httpMethods: string seq, f: 'p -> 'r, ?config) =
+        this.methods s route httpMethods (AsParameters.Of f) config
 
     //****************************************************************************************************
     // TypedResult Maps
@@ -171,3 +211,37 @@ type RouterBaseBuilder<'state>() =
     [<CustomOperation(HttpMethodName.Delete)>]
     member this.MapDelete<'a1, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'a1 -> ValueTask<'t>, ?config) =
         this.delete state route (AsParameters.OfValueTask f) config
+
+    //----------------------------------------------------------------------------------------------------
+    // MapPatch
+    [<CustomOperation(HttpMethodName.Patch)>]
+    member this.MapPatch<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> 't, ?config) =
+        this.patch state route (AsParameters.Of f) config
+
+    [<CustomOperation(HttpMethodName.Patch)>]
+    member this.MapPatch<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> Task<'t>, ?config) =
+        this.patch state route (AsParameters.OfTask f) config
+
+    [<CustomOperation(HttpMethodName.Patch)>]
+    member this.MapPatch<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> Async<'t>, ?config) =
+        this.patch state route (AsParameters.OfAsync f) config
+
+    //----------------------------------------------------------------------------------------------------
+    // MapMethods
+    [<CustomOperation(HttpMethodName.Methods)>]
+    member this.MapMethods<'p, 't when 't :> IResult>
+        (state, route, httpMethods: string seq, _: unit -> 't, f: 'p -> 't, ?config)
+        =
+        this.methods state route httpMethods (AsParameters.Of f) config
+
+    [<CustomOperation(HttpMethodName.Methods)>]
+    member this.MapMethods<'p, 't when 't :> IResult>
+        (state, route, httpMethods: string seq, _: unit -> 't, f: 'p -> Task<'t>, ?config)
+        =
+        this.methods state route httpMethods (AsParameters.OfTask f) config
+
+    [<CustomOperation(HttpMethodName.Methods)>]
+    member this.MapMethods<'p, 't when 't :> IResult>
+        (state, route, httpMethods: string seq, _: unit -> 't, f: 'p -> Async<'t>, ?config)
+        =
+        this.methods state route httpMethods (AsParameters.OfAsync f) config
