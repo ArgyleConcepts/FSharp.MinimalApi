@@ -75,7 +75,7 @@ let routes =
 
         get "/delay/{n}" produces<NoContent> (fun (req: {| n: int |}) ->
             async {
-                do! min 10 req.n |> TimeSpan.FromSeconds |> Async.Sleep
+                do! min 10 req.n |> float |> TimeSpan.FromSeconds |> Async.Sleep
                 return NoContent()
             })
 
