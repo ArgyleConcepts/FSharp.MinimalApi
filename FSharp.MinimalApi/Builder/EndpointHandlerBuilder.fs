@@ -61,7 +61,7 @@ type RouterBaseBuilder<'state>() =
     //****************************************************************************************************
     // MapGet
     [<CustomOperation(HttpMethodName.Get)>]
-    member inline this.MapGet(s, route, f: 'p -> 'r, ?config) =
+    member this.MapGet(s, route, f: 'p -> 'r, ?config) =
         this.get s route (AsParameters.Of f) config
 
     [<CustomOperation(HttpMethodName.Get)>]
