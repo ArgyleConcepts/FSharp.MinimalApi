@@ -3,8 +3,13 @@ module ProducesTests
 open System
 open System.Net
 open System.Net.Http
+open System.Text
+open System.Text.Json.Nodes
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.HttpResults
+open Microsoft.Extensions.DependencyInjection
 open Xunit
 open FSharp.MinimalApi.Builder
 open Harness
@@ -301,6 +306,108 @@ let ``handlers without produces declare only what the result type provides`` () 
     do! expectBody HttpStatusCode.OK "\"typed\"" typed
     let! untyped = get app "/untyped"
     do! expectBody HttpStatusCode.OK "\"untyped\"" untyped
+  }
+
+let private namedResult (req: Id) : Task<Results<Ok<string>, NotFound>> =
+  task {
+    if req.id > 0 then
+      return Results2.first (Ok(sprintf "found %d" req.id))
+    else
+      return Results2.second (NotFound())
+  }
+
+let private namedSync (req: Id) : Results<Ok<string>, NotFound> =
+  if req.id > 0 then
+    Results2.first (Ok(sprintf "found %d" req.id))
+  else
+    Results2.second (NotFound())
+
+let private namedAsync (req: Id) : Async<Results<Ok<string>, NotFound>> = async { return namedSync req }
+
+let private requiredValue value =
+  match value with
+  | Some value -> value
+  | None -> failwith "Expected a value"
+
+let private requiredProperty (node: JsonNode) (key: string) =
+  node[key] |> Option.ofObj |> requiredValue
+
+[<Fact>]
+let ``named handlers need no phantom result and retain response metadata`` () =
+  task {
+    use! app =
+      startWith (fun services -> services.AddOpenApi() |> ignore) (fun app ->
+        app.MapOpenApi() |> ignore
+
+        let routes =
+          endpoints {
+            get "/named/{id}" namedResult
+            get "/sync/{id}" namedSync
+            get "/async/{id}" namedAsync
+          }
+
+        routes.Apply app |> ignore)
+
+    for shape in [ "named"; "sync"; "async" ] do
+      let route = sprintf "/%s/{id}" shape
+      Assert.Equal<(int * Type) list>([ 200, typeof<string>; 404, typeof<Void> ], producedBy (endpoint app "GET" route))
+      let! found = get app (sprintf "/%s/5" shape)
+      do! expectBody HttpStatusCode.OK "\"found 5\"" found
+      let! missing = get app (sprintf "/%s/0" shape)
+      do! expectBody HttpStatusCode.NotFound "" missing
+
+      let! document =
+        app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
+
+      let json = JsonNode.Parse(document) |> Option.ofObj |> requiredValue
+
+      let responses =
+        [ "paths"; route; "get"; "responses" ] |> List.fold requiredProperty json
+
+      Assert.NotNull(responses["200"])
+      Assert.NotNull(responses["404"])
+  }
+
+type RawJsonResult(bytes: byte array) =
+  interface IResult with
+    member _.ExecuteAsync(context) =
+      task {
+        context.Response.ContentType <- "application/json"
+        do! context.Response.Body.WriteAsync(ReadOnlyMemory<byte>(bytes), context.RequestAborted)
+      }
+      :> Task
+
+let private rawJson (req: Id) : Results<RawJsonResult, NotFound> =
+  if req.id > 0 then
+    Results2.first (RawJsonResult(Encoding.UTF8.GetBytes("{\"id\":1}")))
+  else
+    Results2.second (NotFound())
+
+[<Fact>]
+let ``custom IResult writes exact pre-serialized bytes`` () =
+  task {
+    use! app =
+      serve (
+        endpoints {
+          get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, typeof<obj>, "application/json"))
+        }
+      )
+
+    Assert.Equal<(int * Type) list>(
+      [ 200, typeof<obj>; 404, typeof<Void> ],
+      producedBy (endpoint app "GET" "/raw/{id}")
+    )
+
+    let! response = get app "/raw/1"
+
+    let! actual =
+      response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+    Assert.Equal<byte>(Encoding.UTF8.GetBytes("{\"id\":1}"), actual)
+    Assert.Equal("application/json", (response.Content.Headers.ContentType |> Option.ofObj |> requiredValue).MediaType)
+    let! missing = get app "/raw/0"
+    do! expectBody HttpStatusCode.NotFound "" missing
   }
 
 // The builder only reads the type from produces<...>, it never calls it for a value.
