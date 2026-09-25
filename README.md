@@ -127,6 +127,28 @@ let main args =
     0
 ```
 
+## Pull request validation
+
+[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, and checks F# formatting with Fantomas.
+
+To reproduce the validation locally, run these commands from the repository root:
+
+```sh
+dotnet restore FSharp.MinimalApi.sln
+dotnet tool restore
+dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
+dotnet test FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
+dotnet fantomas check .
+```
+
+Maintainer setup:
+
+1. In Azure DevOps, create a YAML pipeline for `ArgyleConcepts/FSharp.MinimalApi`, select `develop` and `azure-pipelines.yml`, and authorize the existing **ArgyleConcepts** GitHub App service connection for the pipeline. The service connection must have access to this repository and permission to post PR checks; keep its credentials in Azure DevOps.
+2. Open a PR targeting `develop` and confirm Azure Pipelines starts automatically and posts a successful check. Changes to that PR should start another run.
+3. In the GitHub repository settings, protect `develop` and require the Azure Pipelines check observed on the PR. Configure it to require the current commit's check before merging. Verify that a failed formatting or test run blocks the PR, then restore the passing commit.
+
+Package build and publication metadata are being finalized in FSMAPI-4. Package publishing remains a separate release decision.
+
 ## OpenAPI
 
 `FSharp.MinimalApi.OpenApi` makes [Microsoft.AspNetCore.OpenApi](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/overview) describe F# types the way [FSharp.SystemTextJson](https://github.com/Tarmil/FSharp.SystemTextJson) serializes them. Without it, records, unions, options and F# collections appear as empty schemas, because FSharp.SystemTextJson's converters hide their structure from the generator.
