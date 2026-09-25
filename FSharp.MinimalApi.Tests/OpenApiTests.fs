@@ -421,3 +421,107 @@ let ``AddFSharp explains missing JSON converter before schema generation`` () =
 
   Assert.Contains("ConfigureHttpJsonOptions", error.Message)
   Assert.Contains("FSharp.SystemTextJson", error.Message)
+
+let private mismatchedOptions scenario =
+  let options = JsonFSharpOptions.Default()
+
+  match scenario with
+  | "encoding" -> options.WithUnionExternalTag()
+  | "types" -> options.WithTypes(JsonFSharpTypes.Records)
+  | "map" -> options.WithMapFormat(MapFormat.ArrayOfPairs)
+  | "tag" -> options.WithUnionTagName("kind")
+  | _ -> invalidArg (nameof scenario) "Unknown configuration scenario."
+
+[<Theory>]
+[<InlineData("encoding")>]
+[<InlineData("types")>]
+[<InlineData("map")>]
+[<InlineData("tag")>]
+let ``AddFSharp explains mismatched JSON options`` scenario =
+  let openApiOptions = OpenApiOptions()
+  openApiOptions.AddFSharp() |> ignore
+
+  let serializerOptions =
+    JsonSerializerOptions(TypeInfoResolver = DefaultJsonTypeInfoResolver())
+
+  (mismatchedOptions scenario).AddToJsonSerializerOptions serializerOptions
+
+  let error =
+    Assert.Throws<InvalidOperationException>(fun () ->
+      openApiOptions.CreateSchemaReferenceId.Invoke(serializerOptions.GetTypeInfo(typeof<Payload>))
+      |> ignore)
+
+  Assert.Contains("do not match", error.Message)
+  Assert.Contains("ConfigureHttpJsonOptions", error.Message)
+  Assert.Contains("AddFSharp", error.Message)
+
+[<Fact>]
+let misconfiguredDocumentProbe () =
+  task {
+    // Only the subprocess enters the dangerous path; the normal suite never risks a stack overflow.
+    match Environment.GetEnvironmentVariable "FSMAPI_JSON_CONFIGURATION_PROBE" with
+    | null -> ()
+    | scenario ->
+      use! app =
+        startWith
+          (fun services ->
+            if scenario <> "missing" then
+              services.ConfigureHttpJsonOptions(fun o ->
+                (mismatchedOptions scenario).AddToJsonSerializerOptions o.SerializerOptions)
+              |> ignore
+
+            services.AddOpenApi(fun o -> o.AddFSharp() |> ignore) |> ignore)
+          (fun app ->
+            app.MapOpenApi() |> ignore
+            app.MapGet("/sample", Func<Sample>(fun () -> samples.Head)) |> ignore)
+
+      let! error =
+        Assert.ThrowsAsync<InvalidOperationException>(fun () ->
+          app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
+          :> System.Threading.Tasks.Task)
+
+      Assert.Contains("FSharp.SystemTextJson", error.Message)
+      Assert.Contains("ConfigureHttpJsonOptions", error.Message)
+      Assert.Contains("AddFSharp", error.Message)
+      Console.WriteLine("FSMAPI-9: caught expected InvalidOperationException")
+  }
+
+[<Theory>]
+[<InlineData("missing")>]
+[<InlineData("encoding")>]
+[<InlineData("types")>]
+[<InlineData("map")>]
+[<InlineData("tag")>]
+let ``misconfigured document fails safely in an isolated process`` scenario =
+  task {
+    let startInfo = System.Diagnostics.ProcessStartInfo("dotnet")
+    startInfo.UseShellExecute <- false
+    startInfo.RedirectStandardOutput <- true
+    startInfo.RedirectStandardError <- true
+    startInfo.ArgumentList.Add(typeof<Sample>.Assembly.Location)
+    startInfo.ArgumentList.Add("-method")
+    startInfo.ArgumentList.Add("OpenApiTests.misconfiguredDocumentProbe")
+    startInfo.Environment["FSMAPI_JSON_CONFIGURATION_PROBE"] <- scenario
+    use child = new System.Diagnostics.Process(StartInfo = startInfo)
+    Assert.True(child.Start())
+
+    let stdout =
+      child.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken)
+
+    let stderr =
+      child.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken)
+
+    try
+      do!
+        child
+          .WaitForExitAsync(TestContext.Current.CancellationToken)
+          .WaitAsync(TimeSpan.FromSeconds 30., TestContext.Current.CancellationToken)
+    finally
+      if not child.HasExited then
+        child.Kill(true)
+
+    let! output = stdout
+    let! errors = stderr
+    Assert.True(child.ExitCode = 0, $"Probe '%s{scenario}' exited with %d{child.ExitCode}:\n%s{output}\n%s{errors}")
+    Assert.Contains("FSMAPI-9: caught expected InvalidOperationException", output)
+  }

@@ -382,6 +382,8 @@ type FSharpSchemaTransformer(options: JsonFSharpOptions) =
         member _.TransformAsync(schema, context, cancellationToken) =
             // Set inside the task so the AsyncLocal change is scoped to this call and never leaks to the caller.
             task {
+                // Validate before schemaFor can re-enter the generator. Reference-id callbacks run too late.
+                JsonConfiguration.validate options context.JsonTypeInfo.Options
                 let previous = building.Value
 
                 let active =

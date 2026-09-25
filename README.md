@@ -183,7 +183,7 @@ Its planned package ID is `ArgyleConcepts.FSharp.MinimalApi.OpenApi`.
 
 Pass the same `JsonFSharpOptions` you use for serialization:
 
-Register both `ConfigureHttpJsonOptions` and `AddOpenApi` when using `AddFSharp`. The JSON converter must be installed before OpenAPI schema generation; otherwise document generation throws an `InvalidOperationException` with setup guidance.
+`AddFSharp` configures schemas; it does not register the HTTP JSON converter. Both `ConfigureHttpJsonOptions` (with `AddToJsonSerializerOptions`) and `AddOpenApi` (with `AddFSharp`) are required. Pass the same `JsonFSharpOptions` to both registrations, including any custom naming policy instances. Missing converters or mismatched options cause document generation to throw a clear `InvalidOperationException` with setup guidance.
 
 ```fsharp
 open System.Text.Json.Serialization
