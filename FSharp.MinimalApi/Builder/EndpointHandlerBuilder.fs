@@ -150,6 +150,10 @@ type RouterBaseBuilder<'state>() =
     member this.MapGet<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> Async<'t>, ?config) =
         this.get state route (AsParameters.OfAsync f) config
 
+    [<CustomOperation(HttpMethodName.Get)>]
+    member this.MapGet<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> ValueTask<'t>, ?config) =
+        this.get state route (AsParameters.OfValueTask f) config
+
     //----------------------------------------------------------------------------------------------------
     // MapPost
 
@@ -164,6 +168,10 @@ type RouterBaseBuilder<'state>() =
     [<CustomOperation(HttpMethodName.Post)>]
     member this.MapPost<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> Async<'t>, ?config) =
         this.post state route (AsParameters.OfAsync f) config
+
+    [<CustomOperation(HttpMethodName.Post)>]
+    member this.MapPost<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> ValueTask<'t>, ?config) =
+        this.post state route (AsParameters.OfValueTask f) config
 
     //----------------------------------------------------------------------------------------------------
     // MapPut
@@ -181,6 +189,10 @@ type RouterBaseBuilder<'state>() =
     member this.MapPut<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> Async<'t>, ?config) =
         this.put state route (AsParameters.OfAsync f) config
 
+    [<CustomOperation(HttpMethodName.Put)>]
+    member this.MapPut<'p, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'p -> ValueTask<'t>, ?config) =
+        this.put state route (AsParameters.OfValueTask f) config
+
     //----------------------------------------------------------------------------------------------------
     // MapDelete
     // Get 1
@@ -195,6 +207,10 @@ type RouterBaseBuilder<'state>() =
     [<CustomOperation(HttpMethodName.Delete)>]
     member this.MapDelete<'a1, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'a1 -> Async<'t>, ?config) =
         this.delete state route (AsParameters.OfAsync f) config
+
+    [<CustomOperation(HttpMethodName.Delete)>]
+    member this.MapDelete<'a1, 't when 't :> IResult>(state, route, _: unit -> 't, f: 'a1 -> ValueTask<'t>, ?config) =
+        this.delete state route (AsParameters.OfValueTask f) config
 
     //----------------------------------------------------------------------------------------------------
     // MapPatch
