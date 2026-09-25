@@ -5,7 +5,9 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.RateLimiting
 open Microsoft.AspNetCore.Routing
+open Microsoft.Extensions.DependencyInjection
 open FSharp.MinimalApi
 
 [<NoEquality; NoComparison>]
@@ -80,6 +82,21 @@ type EndpointsBuilder(?groupName: string) =
     member _.Description(state, desc) =
         { state with
             MapFn = state.MapFn >> (fun e -> e.WithDescription(desc)) }
+
+    [<CustomOperation("summary")>]
+    member _.Summary(state, summary) =
+        { state with
+            MapFn = state.MapFn >> (fun e -> e.WithSummary(summary)) }
+
+    [<CustomOperation("rateLimit")>]
+    member _.RateLimit(state, policy: string) =
+        { state with
+            MapFn = state.MapFn >> (fun e -> e.RequireRateLimiting(policy)) }
+
+    [<CustomOperation("outputCache")>]
+    member _.OutputCache(state, policy: string) =
+        { state with
+            MapFn = state.MapFn >> (fun e -> e.CacheOutput(policy)) }
 
     [<CustomOperation("requireAuthorization")>]
     member _.RequireAuth(state) =

@@ -16,6 +16,7 @@
         <Compile Include="RouteBuilderTests.fs"/>
         <Compile Include="ServicesTests.fs"/>
         <Compile Include="BindingTests.fs"/>
+        <Compile Include="ModernEndpointTests.fs"/>
         <Compile Include="OpenApiTests.fs"/>
     </ItemGroup>
 

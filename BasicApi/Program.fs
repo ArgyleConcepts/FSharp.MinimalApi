@@ -110,6 +110,32 @@ let routes =
                     | None -> return !!NotFound()
                 })
 
+            patch
+                "/{userId}/name"
+                produces<Ok<User>, NotFound, ValidationProblem>
+                (fun
+                    (req:
+                        {| userId: Guid
+                           rename: RenameUser
+                           db: MyDbContext |}) ->
+                    task {
+                        let! existing = req.db.Users.TryFirstAsync(fun x -> x.Id = UserId req.userId)
+
+                        match existing with
+                        | None -> return !!NotFound()
+                        | Some user ->
+                            let nameErrors = UserName.errors req.rename.Name
+
+                            if nameErrors.Length > 0 then
+                                return !!ValidationProblem(dict [ nameof req.rename.Name, nameErrors ])
+                            else
+                                let changed = { user with Name = req.rename.Name }
+                                req.db.Entry(user).CurrentValues.SetValues(changed)
+                                do! req.db.saveChangesAsync ()
+                                return !!Ok(changed)
+                    })
+                (fun (b: RouteHandlerBuilder) -> b.WithName("rename-user").WithSummary("Rename a user"))
+
             route "profile" {
                 allowAnonymous
 
