@@ -3,16 +3,16 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Library</OutputType>
-        <IsPackable>true</IsPackable>
+        <IsPackable>false</IsPackable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>FSharp.MinimalApi</RootNamespace>
 
-        <Authors>Lucas Teles - lucas.teles@outlook.com</Authors>
-        <Company/>
-        <RepositoryType>GitHub</RepositoryType>
-        <PackageProjectUrl>https://github.com/lucasteles/FSharp.MinimalApi</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/lucasteles/FSharp.MinimalApi</RepositoryUrl>
+        <Authors>Lucas Teles, Argyle Concepts</Authors>
+        <Company>Argyle Concepts</Company>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/ArgyleConcepts/FSharp.MinimalApi</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/ArgyleConcepts/FSharp.MinimalApi</RepositoryUrl>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
         <IncludeSymbols>true</IncludeSymbols>
@@ -23,14 +23,11 @@
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
         <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FSharp.Core" Version="7.0"/>
+        <PackageReference Include="FSharp.Core" Version="$(ArgyleFSharpCoreVersion)"/>
     </ItemGroup>
 </Project>

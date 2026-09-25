@@ -3,15 +3,17 @@
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Library</OutputType>
         <IsPackable>true</IsPackable>
+        <PackageId>ArgyleConcepts.FSharp.MinimalApi.OpenApi</PackageId>
+        <PackageVersion>$(ArgylePackageVersion)</PackageVersion>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <Authors>Lucas Teles - lucas.teles@outlook.com</Authors>
-        <Company/>
+        <Authors>Argyle Concepts</Authors>
+        <Company>Argyle Concepts</Company>
         <Description>OpenAPI schemas for F# types with Microsoft.AspNetCore.OpenApi and FSharp.SystemTextJson</Description>
-        <RepositoryType>GitHub</RepositoryType>
-        <PackageProjectUrl>https://github.com/lucasteles/FSharp.MinimalApi</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/lucasteles/FSharp.MinimalApi</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/ArgyleConcepts/FSharp.MinimalApi</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/ArgyleConcepts/FSharp.MinimalApi</RepositoryUrl>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
         <IncludeSymbols>true</IncludeSymbols>
@@ -24,6 +26,7 @@
 
     <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\"/>
+        <None Include="..\LICENSE" Pack="true" PackagePath="\"/>
     </ItemGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
         <DebugSymbols>true</DebugSymbols>
@@ -31,7 +34,6 @@
 
     <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App"/>
-        <PackageReference Update="FSharp.Core" Version="7.0"/>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12"/>
         <PackageReference Include="FSharp.SystemTextJson" Version="1.4.36"/>
     </ItemGroup>
