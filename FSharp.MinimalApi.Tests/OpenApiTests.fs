@@ -4,6 +4,7 @@ open System
 open System.Text.Json
 open System.Text.Json.Nodes
 open System.Text.Json.Serialization
+open System.Text.Json.Serialization.Metadata
 open Json.Schema
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http.Json
@@ -376,3 +377,20 @@ let ``AddFSharp without options uses the default encoding`` () =
     Assert.Equal(explicitDefaults, withDefaults)
     Assert.Contains("\"Sample\"", withDefaults)
   }
+
+[<Fact>]
+let ``AddFSharp explains missing JSON converter before schema generation`` () =
+  let openApiOptions = OpenApiOptions()
+  openApiOptions.AddFSharp() |> ignore
+
+  let serializerOptions =
+    JsonSerializerOptions(TypeInfoResolver = DefaultJsonTypeInfoResolver())
+
+  let typeInfo = serializerOptions.GetTypeInfo(typeof<Sample>)
+
+  let error =
+    Assert.Throws<InvalidOperationException>(fun () ->
+      openApiOptions.CreateSchemaReferenceId.Invoke(typeInfo) |> ignore)
+
+  Assert.Contains("ConfigureHttpJsonOptions", error.Message)
+  Assert.Contains("FSharp.SystemTextJson", error.Message)

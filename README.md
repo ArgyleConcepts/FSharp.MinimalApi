@@ -159,6 +159,8 @@ $ dotnet add package FSharp.MinimalApi.OpenApi
 
 Pass the same `JsonFSharpOptions` you use for serialization:
 
+Register both `ConfigureHttpJsonOptions` and `AddOpenApi` when using `AddFSharp`. The JSON converter must be installed before OpenAPI schema generation; otherwise document generation throws an `InvalidOperationException` with setup guidance.
+
 ```fsharp
 open System.Text.Json.Serialization
 open FSharp.MinimalApi.OpenApi
