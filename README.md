@@ -145,7 +145,7 @@ Maintainer setup:
 
 1. The Azure pipeline uses the existing **ArgyleConcepts** GitHub App service connection and `azure-pipelines.yml`. Confirm that the connection has access to `ArgyleConcepts/FSharp.MinimalApi` and permission to post PR checks; keep its credentials in Azure DevOps. After this YAML is merged, set the pipeline's default branch to `develop`.
 2. Open a PR targeting `develop` and confirm Azure Pipelines starts automatically and posts a successful check. Changes to that PR should start another run.
-3. In the GitHub repository settings, protect `develop` and require the Azure Pipelines check observed on the PR. Configure it to require the current commit's check before merging. Verify that a failed formatting or test run blocks the PR, then restore the passing commit.
+3. In the GitHub repository settings, protect `develop` and require the **FSharp.MinimalApi PR Validation** check from Azure Pipelines. Require the branch to be up to date before merging. A failed formatting or test run must block the PR.
 
 Package build and publication metadata are being finalized in FSMAPI-4. Package publishing remains a separate release decision.
 

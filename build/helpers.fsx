@@ -129,7 +129,7 @@ let generateCoverageReport () =
         [ $"{solutionDir}/tests/**/coverage.cobertura.xml" ]
 
 
-let   fantomasCheck () =
+let fantomasCheck () =
     let result = DotNet.exec id "fantomas" "check ."
 
     if result.ExitCode <> 0 then
