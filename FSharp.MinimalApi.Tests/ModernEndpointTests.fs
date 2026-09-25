@@ -22,26 +22,33 @@ open type TypedResults
 
 let private item (req: {| id: int |}) = Ok req.id
 
+let private requiredValue value =
+  match value with
+  | Some value -> value
+  | None -> failwith "Expected a value"
+
 let private requiredName (mapped: Endpoint) =
   mapped.Metadata.GetMetadata<IEndpointNameMetadata>()
   |> Option.ofObj
-  |> Option.get
+  |> requiredValue
 
 let private requiredSummary (mapped: Endpoint) =
   mapped.Metadata.GetMetadata<IEndpointSummaryMetadata>()
   |> Option.ofObj
-  |> Option.get
+  |> requiredValue
 
 let private requiredMethods (mapped: Endpoint) =
-  mapped.Metadata.GetMetadata<IHttpMethodMetadata>() |> Option.ofObj |> Option.get
+  mapped.Metadata.GetMetadata<IHttpMethodMetadata>()
+  |> Option.ofObj
+  |> requiredValue
 
 let private requiredRateLimit (mapped: Endpoint) =
   mapped.Metadata.GetMetadata<EnableRateLimitingAttribute>()
   |> Option.ofObj
-  |> Option.get
+  |> requiredValue
 
 let private requiredProperty (node: JsonNode) (name: string) =
-  node[name] |> Option.ofObj |> Option.get
+  node[name] |> Option.ofObj |> requiredValue
 
 [<Fact>]
 let ``PATCH and methods map F# handlers inside groups`` () =
@@ -58,7 +65,7 @@ let ``PATCH and methods map F# handlers inside groups`` () =
               b.WithName("patch-item").WithSummary("Patch an item").DisableValidation())
 
             methods "/inspect/{id}" [ "HEAD"; "OPTIONS" ] (fun (req: {| id: int; ctx: HttpContext |}) ->
-              req.ctx.Response.Headers["X-Id"] <- string req.id
+              req.ctx.Response.Headers["X-Id"] <- req.id.ToString()
               NoContent())
           }
 
@@ -78,7 +85,7 @@ let ``PATCH and methods map F# handlers inside groups`` () =
     for verb in [ HttpMethod.Head; HttpMethod.Options ] do
       let! result = send app (request verb "/api/inspect/7")
       do! expectBody HttpStatusCode.NoContent "" result
-      Assert.Equal("7", result.Headers.GetValues("X-Id") |> Seq.head)
+      Assert.Equal("7", result.Headers.GetValues("X-Id") |> Seq.tryHead |> requiredValue)
 
     let! notMapped = get app "/api/items/42"
     let! _ = expect HttpStatusCode.MethodNotAllowed notMapped
@@ -86,7 +93,7 @@ let ``PATCH and methods map F# handlers inside groups`` () =
     let! document =
       app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
 
-    let json = JsonNode.Parse(document) |> Option.ofObj |> Option.get
+    let json = JsonNode.Parse(document) |> Option.ofObj |> requiredValue
 
     [ "paths"; "/api/items/{id}"; "patch"; "responses"; "200" ]
     |> List.fold requiredProperty json
@@ -188,7 +195,7 @@ let ``group filter runs for PATCH without changing other routes`` () =
           route "filtered" {
             filter (fun ctx next ->
               if ctx.HttpContext.Request.Headers.ContainsKey("X-Block") then
-                ValueTask<obj>(Results.BadRequest())
+                ValueTask<objnull>(Results.BadRequest())
               else
                 next ctx)
 
@@ -266,7 +273,7 @@ let ``group output cache policy uses ASP.NET Core middleware`` () =
 
               get "/item" (fun () ->
                 calls <- calls + 1
-                string calls)
+                calls.ToString())
             }
 
           routes.Apply app |> ignore)
