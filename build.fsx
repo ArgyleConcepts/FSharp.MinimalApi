@@ -19,7 +19,11 @@ target "build" (fun _ ->
     solutionDir
     |> DotNet.build (fun c ->
         { c with
-            Configuration = DotNet.BuildConfiguration.Release }))
+            Configuration = DotNet.BuildConfiguration.Release
+            // FAKE can't read the binary log format of the .NET 10 SDK.
+            MSBuildParams =
+                { c.MSBuildParams with
+                    DisableInternalBinLog = true } }))
 
 help "Run dotnet restore in everty project"
 
@@ -27,9 +31,15 @@ target "restore" (fun _ ->
     DotNet.restore id |> ignore
     DotNet.exec id "tool restore" |> ignore)
 
-help "Run all tests"
+help "Run all tests with coverage, failing when a library drops below the threshold"
 
-target "test" (fun ctx -> !!"**/**.Tests*.*sproj" |> printFiles ctx.TargetInfo.Name |> Seq.iter dotnetTest)
+target "test" (fun ctx ->
+    let projects =
+        !!"**/**.Tests*.*sproj" |> printFiles ctx.TargetInfo.Name |> List.ofSeq
+
+    Directory.ensure testReportFolder
+    projects |> List.iter dotnetTest
+    checkCoverage projects)
 
 help "Update all local tools"
 target "update-tools" (run updateLocalTools)
