@@ -36,7 +36,7 @@ steps:
   - script: dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
     displayName: Build solution
 
-  - script: dotnet test FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
+  - script: dotnet test --solution FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
     displayName: Run tests
 
   - script: dotnet fantomas check .

@@ -137,7 +137,7 @@ To reproduce the validation locally, run these commands from the repository root
 dotnet restore FSharp.MinimalApi.sln
 dotnet tool restore
 dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
-dotnet test FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
+dotnet test --solution FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
 dotnet fantomas check .
 ```
 
