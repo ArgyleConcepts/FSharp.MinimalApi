@@ -17,6 +17,15 @@ type OpenApiOptions with
 
         options.CreateSchemaReferenceId <-
             Func<JsonTypeInfo, string | null>(fun typeInfo ->
+                if
+                    not (
+                        typeInfo.Options.Converters
+                        |> Seq.exists (fun converter -> converter :? JsonFSharpConverter)
+                    )
+                then
+                    invalidOp
+                        "FSharp.MinimalApi.OpenApi requires the FSharp.SystemTextJson converter. Register JsonFSharpOptions with ConfigureHttpJsonOptions before generating an OpenAPI document."
+
                 if FSharpShape.isInline typeInfo.Type then
                     null
                 else
