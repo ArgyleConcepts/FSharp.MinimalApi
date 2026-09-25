@@ -54,7 +54,7 @@ module internal Schema =
     ///     represents recursive types; an OpenApiSchemaReference here would make it follow the cycle forever.
     /// </summary>
     let componentPlaceholder (id: string) =
-        OpenApiSchema(Metadata = Dictionary<string, obj>(dict [ schemaIdKey, box id ])) :> IOpenApiSchema
+        OpenApiSchema(Metadata = Dictionary<string, obj>(dict [ schemaIdKey, id :> obj ])) :> IOpenApiSchema
 
     /// <summary>
     ///     Copies an inline schema's structure into the schema being transformed.

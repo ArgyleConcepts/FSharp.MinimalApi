@@ -121,7 +121,7 @@ module internal Naming =
 
     /// Record field name: [<JsonName>], then [<JsonPropertyName>], then the serializer's naming policy.
     let recordField (serializerOptions: JsonSerializerOptions) (property: PropertyInfo) =
-        match jsonNames property |> Seq.tryFind (fun a -> isNull a.Field) with
+        match jsonNames property |> Seq.tryFind (fun a -> obj.ReferenceEquals(a.Field, null)) with
         | Some attribute -> jsonNameText attribute.Name
         | None ->
             match property.GetCustomAttribute<JsonPropertyNameAttribute>(true) with
@@ -133,7 +133,7 @@ module internal Naming =
         match
             case.GetCustomAttributes(typeof<JsonNameAttribute>)
             |> Seq.cast<JsonNameAttribute>
-            |> Seq.tryFind (fun a -> isNull a.Field)
+            |> Seq.tryFind (fun a -> obj.ReferenceEquals(a.Field, null))
         with
         | Some attribute -> toNode attribute.Name
         | None -> text (convert options.UnionTagNamingPolicy case.Name)

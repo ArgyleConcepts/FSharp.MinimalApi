@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ArgyleConcepts.FSharp.MinimalApi" Version="$(ArgylePackageVersion)" />
+    <PackageReference Include="ArgyleConcepts.FSharp.MinimalApi.OpenApi" Version="$(ArgylePackageVersion)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+</Project>
