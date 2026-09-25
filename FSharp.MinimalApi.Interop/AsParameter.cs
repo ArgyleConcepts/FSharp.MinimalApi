@@ -19,14 +19,16 @@ public static class AsParameters
             ? CreateDynamic(nameof(OfTask), requestDelegate)
             : IsAsync<TResult>()
                 ? CreateDynamic(nameof(OfAsync), requestDelegate)
-                : typeof(TParam) == typeof(Unit)
-                    ? typeof(TResult) == typeof(Unit)
-                        ? void () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
-                        : () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
-                    : typeof(TResult) == typeof(Unit)
-                        ? void ([AsParameters] TParam parameters) =>
-                        requestDelegate.Invoke(parameters)
-                        : ([AsParameters] TParam parameters) => requestDelegate.Invoke(parameters);
+                : IsValueTaskOfUnit<TResult>()
+                    ? CreateDynamic(nameof(OfValueTask), requestDelegate)
+                    : typeof(TParam) == typeof(Unit)
+                        ? typeof(TResult) == typeof(Unit)
+                            ? void () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
+                            : () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
+                        : typeof(TResult) == typeof(Unit)
+                            ? void ([AsParameters] TParam parameters) =>
+                            requestDelegate.Invoke(parameters)
+                            : ([AsParameters] TParam parameters) => requestDelegate.Invoke(parameters);
 
     /// <summary>
     /// Creates task delegates with AsParametersAttribute
@@ -66,12 +68,31 @@ public static class AsParameters
                 FSharpAsync.StartImmediateAsTask(requestDelegate.Invoke(parameters),
                     cancellationToken);
 
+    /// <summary>
+    /// Creates ValueTask delegates while preserving the concrete result type and metadata.
+    /// </summary>
+    public static Delegate OfValueTask<TParam, TResult>(
+        FSharpFunc<TParam, ValueTask<TResult>> requestDelegate) =>
+        typeof(TParam) == typeof(Unit)
+            ? typeof(TResult) == typeof(Unit)
+                ? ValueTask () => IgnoreResult(requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>()))
+                : ValueTask<TResult> () => requestDelegate.Invoke(Operators.Unchecked.DefaultOf<TParam>())
+            : typeof(TResult) == typeof(Unit)
+                ? ValueTask ([AsParameters] TParam parameters) => IgnoreResult(requestDelegate.Invoke(parameters))
+                : ValueTask<TResult> ([AsParameters] TParam parameters) => requestDelegate.Invoke(parameters);
+
+    static async ValueTask IgnoreResult<T>(ValueTask<T> value) => await value;
+
     // A plain Task has no result to unwrap; the delegate returns it as is and ASP.NET awaits it.
     static bool IsTask<T>() =>
         typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Task<>);
 
     static bool IsAsync<T>() =>
         (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(FSharpAsync<>));
+
+    // ValueTask<T> already works through the ordinary delegate. Only Unit needs
+    // adapting to a non-generic ValueTask so it produces an empty response.
+    static bool IsValueTaskOfUnit<T>() => typeof(T) == typeof(ValueTask<Unit>);
 
     static Delegate CreateDynamic<TParam, TResult>(string methodName,
         FSharpFunc<TParam, TResult> requestDelegate)

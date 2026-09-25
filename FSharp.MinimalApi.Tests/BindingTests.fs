@@ -3,7 +3,9 @@ module BindingTests
 open System
 open System.Net
 open System.Net.Http
+open System.Reflection
 open System.Text
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Mvc
 open Xunit
@@ -23,6 +25,41 @@ type OptionalTenant =
     tenant: string | null
   }
 
+type ItemId =
+  | ItemId of int
+
+  static member TryParse(value: string, result: byref<ItemId>) =
+    match Int32.TryParse value with
+    | true, n when n > 0 ->
+      result <- ItemId n
+      true
+    | _ ->
+      result <- Unchecked.defaultof<ItemId>
+      false
+
+type HeaderBound =
+  | HeaderBound of string
+
+  static member BindAsync(context: HttpContext, _parameter: ParameterInfo) =
+    ValueTask<HeaderBound>(HeaderBound(context.Request.Headers["X-Item"].ToString()))
+
+type HeaderId =
+  {
+    [<FromHeader(Name = "X-Id")>]
+    itemId: ItemId
+  }
+
+let private customHandler
+  (req:
+    {|
+      itemId: ItemId
+      headerBound: HeaderBound
+    |})
+  =
+  let (ItemId id) = req.itemId
+  let (HeaderBound header) = req.headerBound
+  $"{id}:{header}"
+
 let private routes =
   endpoints {
     get "/items/{id:int}" (fun (req: {| id: int |}) -> req.id)
@@ -33,6 +70,10 @@ let private routes =
       match req.tenant with
       | null -> "none"
       | tenant -> tenant)
+
+    get "/custom/{itemId}" customHandler
+    get "/custom-query" (fun (req: {| itemId: ItemId |}) -> let (ItemId id) = req.itemId in id)
+    get "/custom-header" (fun (req: HeaderId) -> let (ItemId id) = req.itemId in id)
 
     post "/greetings" (fun (req: {| greeting: Greeting |}) -> req.greeting.Name)
   }
@@ -92,6 +133,73 @@ let ``a missing header of a reference type binds as null`` () =
     use! app = serve routes
     let! response = get app "/optional-tenant"
     do! expectBody ok "none" response
+  }
+
+[<Fact>]
+let ``custom TryParse and BindAsync are used inside a named F# parameter shape`` () =
+  task {
+    use! app = serve routes
+    use valid = request HttpMethod.Get "/custom/12"
+    valid.Headers.Add("X-Item", "header")
+    let! response = send app valid
+    do! expectBody ok "12:header" response
+    let! invalid = get app "/custom/not-an-id"
+    let! _ = expect HttpStatusCode.BadRequest invalid
+    let! negative = get app "/custom/-1"
+    let! _ = expect HttpStatusCode.BadRequest negative
+    let! query = get app "/custom-query?itemId=13"
+    do! expectBody ok "13" query
+    let! badQuery = get app "/custom-query?itemId=bad"
+    let! _ = expect HttpStatusCode.BadRequest badQuery
+    use header = request HttpMethod.Get "/custom-header"
+    header.Headers.Add("X-Id", "14")
+    let! headerResult = send app header
+    do! expectBody ok "14" headerResult
+    ()
+  }
+
+[<Fact>]
+let ``option and voption are not inferred as query scalars`` () =
+  task {
+    let cases =
+      [
+        "/option",
+        endpoints { get "/option" (fun (req: {| value: int option |}) -> req.value |> Option.defaultValue -1) }
+        "/voption",
+        endpoints { get "/voption" (fun (req: {| value: int voption |}) -> req.value |> ValueOption.defaultValue -1) }
+      ]
+
+    for url, route in cases do
+      use! app = serve route
+
+      let! error =
+        Assert.ThrowsAsync<InvalidOperationException>(fun () -> get app $"{url}?value=3" :> Task)
+
+      Assert.Contains("Body was inferred", error.Message)
+  }
+
+[<Fact>]
+let ``binding failures never run the named handler`` () =
+  task {
+    let calls = Calls()
+
+    let handler (req: {| id: int; greeting: Greeting |}) =
+      calls.Add $"{req.id}"
+      req.greeting.Name
+
+    use! app = serve (endpoints { post "/probe/{id}" handler })
+    let! badId = postRaw app "/probe/not-an-int" """{"name":"Ada","punctuation":"!"}"""
+    let! _ = expect HttpStatusCode.BadRequest badId
+    let! badBody = postRaw app "/probe/1" "{ broken"
+    let! _ = expect HttpStatusCode.BadRequest badBody
+    use wrongMedia = request HttpMethod.Post "/probe/1"
+    wrongMedia.Content <- new StringContent("""{"name":"Ada"}""", Encoding.UTF8, "text/plain")
+    let! unsupported = send app wrongMedia
+    let! _ = expect HttpStatusCode.UnsupportedMediaType unsupported
+    Assert.Empty calls.All
+    let! valid = postRaw app "/probe/2" """{"name":"Ada","punctuation":"!"}"""
+    do! expectBody ok "Ada" valid
+    Assert.Equal<string list>([ "2" ], calls.All)
   }
 
 [<Fact>]

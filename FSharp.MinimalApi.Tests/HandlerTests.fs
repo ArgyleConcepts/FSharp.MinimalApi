@@ -8,12 +8,14 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.HttpResults
 open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.DependencyInjection
 open Xunit
 open FSharp.MinimalApi.Builder
 open Harness
+open type TypedResults
 
 /// Collects calls from handlers that return nothing, scoped to one app.
 type Calls() =
@@ -36,7 +38,13 @@ type Bound =
     greeting: Greeting
     [<FromServices>]
     calls: Calls
+    ctx: HttpContext
+    cancellationToken: CancellationToken
   }
+
+let private greet (req: Bound) =
+  req.calls.Add $"{req.id}"
+  $"{req.tenant}:{req.search}:{req.greeting.Name}{req.greeting.Punctuation}:{req.ctx.Request.Path}:{req.cancellationToken = req.ctx.RequestAborted}"
 
 let private withCalls (routes: EndpointsMap) =
   startWith (fun services -> services.AddSingleton<Calls>() |> ignore) (fun app -> routes.Apply app |> ignore)
@@ -92,20 +100,13 @@ let ``anonymous record binds route and query values`` () =
 [<Fact>]
 let ``record binds route, query, header, body and services`` () =
   task {
-    use! app =
-      withCalls (
-        endpoints {
-          put "/greet/{id}" (fun (req: Bound) ->
-            req.calls.Add $"%d{req.id}"
-            $"%s{req.tenant}:%s{req.search}:%s{req.greeting.Name}%s{req.greeting.Punctuation}")
-        }
-      )
+    use! app = withCalls (endpoints { put "/greet/{id}" greet })
 
     use message = request HttpMethod.Put "/greet/7?search=abc"
     message.Headers.Add("X-Tenant", "acme")
     message.Content <- Json.JsonContent.Create { Name = "Ada"; Punctuation = "!" }
     let! response = send app message
-    do! expectBody ok "acme:abc:Ada!" response
+    do! expectBody ok "acme:abc:Ada!:/greet/7:True" response
     Assert.Equal<string list>([ "7" ], callsOf app)
   }
 
@@ -149,6 +150,124 @@ let ``Task handlers with and without parameters`` () =
     Assert.Equal<string list>([ "no params"; "3" ], calls.All)
   }
 
+let private valueTaskHandler
+  (req:
+    {|
+      id: int
+      cancellationToken: CancellationToken
+    |})
+  : ValueTask<Ok<int>> =
+  ValueTask<Ok<int>>(Ok(req.id * 2))
+
+let private valueTaskUnit (req: {| calls: Calls |}) : ValueTask<unit> =
+  req.calls.Add "value task"
+  ValueTask<unit>(())
+
+let private valueTaskOutcome (req: {| id: int |}) : ValueTask<Results<Ok<int>, NotFound>> =
+  let outcome: Results<Ok<int>, NotFound> =
+    if req.id > 0 then !!(Ok req.id) else !!(NotFound())
+
+  ValueTask<_>(outcome)
+
+[<Fact>]
+let ``ValueTask handlers preserve typed metadata and unit responses`` () =
+  task {
+    use! app =
+      withCalls (
+        endpoints {
+          get "/value-task/{id:int}" valueTaskHandler
+          get "/value-task/no-params" (fun () -> ValueTask<string>("no params"))
+          post "/value-task/unit" valueTaskUnit
+          post "/value-task/unit-no-params" (fun () -> ValueTask<unit>(()))
+          get "/value-task/typed-no-params" produces<Ok<int>> (fun () -> ValueTask<Ok<int>>(Ok 1))
+          get "/value-task/outcome/{id}" produces<Ok<int>, NotFound> valueTaskOutcome
+          post "/value-task/outcome/{id}" produces<Ok<int>, NotFound> valueTaskOutcome
+          put "/value-task/outcome/{id}" produces<Ok<int>, NotFound> valueTaskOutcome
+          delete "/value-task/outcome/{id}" produces<Ok<int>, NotFound> valueTaskOutcome
+        }
+      )
+
+    Assert.Equal<(int * Type) list>([ 200, typeof<int> ], producedBy (endpoint app "GET" "/value-task/{id:int}"))
+    let! value = get app "/value-task/21"
+    do! expectBody ok "42" value
+    let! noParams = get app "/value-task/no-params"
+    do! expectBody ok "no params" noParams
+    let! unitResult = send app (request HttpMethod.Post "/value-task/unit")
+    do! expectBody ok "" unitResult
+    let! unitNoParams = send app (request HttpMethod.Post "/value-task/unit-no-params")
+    do! expectBody ok "" unitNoParams
+    Assert.Equal<(int * Type) list>([ 200, typeof<int> ], producedBy (endpoint app "GET" "/value-task/typed-no-params"))
+    let! typedNoParams = get app "/value-task/typed-no-params"
+    do! expectBody ok "1" typedNoParams
+    Assert.Equal<string list>([ "value task" ], callsOf app)
+
+    for verb in [ HttpMethod.Get; HttpMethod.Post; HttpMethod.Put; HttpMethod.Delete ] do
+      Assert.Equal<(int * Type) list>(
+        [ 200, typeof<int>; 404, typeof<Void> ],
+        producedBy (endpoint app verb.Method "/value-task/outcome/{id}")
+      )
+
+      let! found = send app (request verb "/value-task/outcome/2")
+      do! expectBody ok "2" found
+      let! missing = send app (request verb "/value-task/outcome/0")
+      do! expectBody HttpStatusCode.NotFound "" missing
+  }
+
+[<Fact>]
+let ``Task and ValueTask handlers receive request cancellation`` () =
+  task {
+    for shape in [ "task"; "value-task" ] do
+      let started =
+        TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+      let stopped =
+        TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+      let handler
+        (req:
+          {|
+            cancellationToken: CancellationToken
+          |})
+        : Task<Ok<string>> =
+        task {
+          use _registration =
+            req.cancellationToken.Register(fun () -> stopped.TrySetResult true |> ignore)
+
+          started.SetResult req.cancellationToken.CanBeCanceled
+          do! Task.Delay(Timeout.Infinite, req.cancellationToken)
+          return Ok "never"
+        }
+
+      let routes =
+        if shape = "task" then
+          endpoints { get "/slow" handler }
+        else
+          endpoints {
+            get
+              "/slow"
+              (fun
+                   (req:
+                     {|
+                       cancellationToken: CancellationToken
+                     |}) -> ValueTask<Ok<string>>(handler req))
+          }
+
+      use! app = serve routes
+      Assert.Equal<(int * Type) list>([ 200, typeof<string> ], producedBy (endpoint app "GET" "/slow"))
+      use abort = new CancellationTokenSource()
+      let pending = app.Client.GetAsync("/slow", abort.Token)
+      let! cancellable = within started.Task
+      Assert.True cancellable
+      abort.Cancel()
+      let! cancelled = within stopped.Task
+      Assert.True cancelled
+
+      let! error =
+        Assert.ThrowsAnyAsync<OperationCanceledException>(fun () -> pending :> Task)
+
+      Assert.NotNull error
+  }
+
 [<Fact>]
 let ``Async handlers with and without parameters`` () =
   task {
@@ -190,6 +309,25 @@ let ``Async handlers run with the request's cancellation token`` () =
       )
 
     let! response = get app "/token"
+    do! expectBody ok "true" response
+  }
+
+[<Fact>]
+let ``Async handler receives the same token through its record and computation`` () =
+  task {
+    let handler
+      (req:
+        {|
+          cancellationToken: CancellationToken
+        |})
+      =
+      async {
+        let! ambient = Async.CancellationToken
+        return req.cancellationToken.CanBeCanceled && req.cancellationToken = ambient
+      }
+
+    use! app = serve (endpoints { get "/token-record" handler })
+    let! response = get app "/token-record"
     do! expectBody ok "true" response
   }
 
