@@ -14,7 +14,7 @@ Keep merge commits available for promotion between long-lived branches. Squash o
 
 [.github/CODEOWNERS](../.github/CODEOWNERS) assigns all files, including the ownership policy itself, to `@david-cyman-argyle`. Both protected branches enable required code-owner reviews with the generic approval count set to zero. GitHub reads ownership from the PR's base branch: merge this setup into `develop` and include it in the first promotion to `master` to activate ownership on each branch.
 
-GitHub does not allow PR authors to approve their own PRs. With a single code owner and protections enforced for admins, David-authored PRs need another eligible code owner or a deliberate policy change before they can merge. Do not silently bypass the policy or add another owner without agreement.
+GitHub does not allow PR authors to approve their own PRs. `@david-cyman-argyle` has an explicit pull-request review bypass on both protected branches so he can merge his own PRs. This is a per-user exception, not a blanket admin exemption: required CI, an up-to-date branch, conversation resolution, and force-push/deletion protections still apply. Other contributors require code-owner approval. Keep using PRs for all changes.
 
 ## Access
 
