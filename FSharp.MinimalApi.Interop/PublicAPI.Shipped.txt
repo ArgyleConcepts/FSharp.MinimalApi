@@ -1,0 +1,5 @@
+#nullable enable
+FSharp.MinimalApi.AsParameters
+static FSharp.MinimalApi.AsParameters.Of<TParam, TResult>(Microsoft.FSharp.Core.FSharpFunc<TParam, TResult>! requestDelegate) -> System.Delegate!
+static FSharp.MinimalApi.AsParameters.OfAsync<TParam, TResult>(Microsoft.FSharp.Core.FSharpFunc<TParam, Microsoft.FSharp.Control.FSharpAsync<TResult>!>! requestDelegate) -> System.Delegate!
+static FSharp.MinimalApi.AsParameters.OfTask<TParam, TResult>(Microsoft.FSharp.Core.FSharpFunc<TParam, System.Threading.Tasks.Task<TResult>!>! requestDelegate) -> System.Delegate!

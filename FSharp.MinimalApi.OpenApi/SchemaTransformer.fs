@@ -176,20 +176,20 @@ type FSharpSchemaTransformer(options: JsonFSharpOptions) =
         let typeInfo = context.JsonTypeInfo.Options.GetTypeInfo t
 
         match openApiOptions.CreateSchemaReferenceId.Invoke typeInfo with
-        | null
-        | "" -> None
+        | null -> None
+        | id when id.Length = 0 -> None
         | id -> Some id
 
     let schemaFor (context: OpenApiSchemaTransformerContext) (cancellationToken: CancellationToken) (t: Type) =
         let active =
-            match building.Value with
-            | null -> ImmutableHashSet<Type>.Empty
-            | value -> value
+            building.Value
+            |> Option.ofObj
+            |> Option.defaultValue ImmutableHashSet<Type>.Empty
 
         if active.Contains t then
             match referenceId context t with
             | Some id -> Task.FromResult(Schema.componentPlaceholder id)
-            | None -> invalidOp $"Recursive type '{t}' must be described by a named schema component."
+            | None -> invalidOp $"Recursive type '%O{t}' must be described by a named schema component."
         else
             task {
                 let! schema = context.GetOrCreateSchemaAsync(t, null, cancellationToken)
@@ -305,7 +305,7 @@ type FSharpSchemaTransformer(options: JsonFSharpOptions) =
                     schemas.Add schema
 
                 // Option's None is null at runtime, so it serializes as null whatever the encoding.
-                if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<option<_>> then
+                if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<obj option> then
                     schemas.Add(Schema.nullSchema ())
 
                 // Untagged cases carry no tag, so one JSON value can fit several of them.
@@ -382,12 +382,12 @@ type FSharpSchemaTransformer(options: JsonFSharpOptions) =
         member _.TransformAsync(schema, context, cancellationToken) =
             // Set inside the task so the AsyncLocal change is scoped to this call and never leaks to the caller.
             task {
+                // Validate before schemaFor can re-enter the generator. Reference-id callbacks run too late.
+                JsonConfiguration.validate options context.JsonTypeInfo.Options
                 let previous = building.Value
 
                 let active =
-                    match previous with
-                    | null -> ImmutableHashSet<Type>.Empty
-                    | value -> value
+                    previous |> Option.ofObj |> Option.defaultValue ImmutableHashSet<Type>.Empty
 
                 building.Value <- active.Add context.JsonTypeInfo.Type
 

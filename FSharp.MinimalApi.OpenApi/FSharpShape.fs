@@ -8,7 +8,7 @@ open System.Text.Json.Serialization
 open Microsoft.FSharp.Reflection
 
 /// The F# type shapes that FSharp.SystemTextJson serializes with its own converters.
-[<RequireQualifiedAccess>]
+[<RequireQualifiedAccess; NoComparison>]
 type internal FSharpShape =
     | Option of inner: Type
     | ValueOption of inner: Type
@@ -28,17 +28,17 @@ module internal FSharpShape =
     let private firstArg (t: Type) = t.GetGenericArguments()[0]
 
     let classify (t: Type) =
-        if isGenericOf typedefof<option<_>> t then
+        if isGenericOf typedefof<obj option> t then
             FSharpShape.Option(firstArg t)
-        elif isGenericOf typedefof<voption<_>> t then
+        elif isGenericOf typedefof<obj voption> t then
             FSharpShape.ValueOption(firstArg t)
-        elif isGenericOf typedefof<Skippable<_>> t then
+        elif isGenericOf typedefof<Skippable<obj>> t then
             FSharpShape.Skippable(firstArg t)
-        elif isGenericOf typedefof<list<_>> t then
+        elif isGenericOf typedefof<obj list> t then
             FSharpShape.List(firstArg t)
-        elif isGenericOf typedefof<Set<_>> t then
+        elif isGenericOf typedefof<Set<string>> t then
             FSharpShape.Set(firstArg t)
-        elif isGenericOf typedefof<Map<_, _>> t then
+        elif isGenericOf typedefof<Map<string, obj>> t then
             let arguments = t.GetGenericArguments()
             FSharpShape.Map(arguments[0], arguments[1])
         elif FSharpType.IsTuple t then
@@ -66,7 +66,8 @@ module internal FSharpShape =
 
     /// Whether FSharp.SystemTextJson owns serialization of this shape under the given options.
     let isHandled (options: JsonFSharpOptions) (shape: FSharpShape) =
-        let has (flag: JsonFSharpTypes) = options.Types.HasFlag flag
+        let types = options.Types
+        let has (flag: JsonFSharpTypes) = types.HasFlag flag
 
         match shape with
         | FSharpShape.Option _ -> has JsonFSharpTypes.Options
@@ -111,7 +112,7 @@ module internal Naming =
     let private jsonNameText (name: JsonName) =
         match name with
         | JsonName.String value -> value
-        | JsonName.Int value -> string value
+        | JsonName.Int value -> string<int> value
         | JsonName.Bool value -> if value then "true" else "false"
 
     let isIgnored (property: PropertyInfo) =
@@ -121,7 +122,7 @@ module internal Naming =
 
     /// Record field name: [<JsonName>], then [<JsonPropertyName>], then the serializer's naming policy.
     let recordField (serializerOptions: JsonSerializerOptions) (property: PropertyInfo) =
-        match jsonNames property |> Seq.tryFind (fun a -> obj.ReferenceEquals(a.Field, null)) with
+        match jsonNames property |> Seq.tryFind (fun a -> isNull (box a.Field)) with
         | Some attribute -> jsonNameText attribute.Name
         | None ->
             match property.GetCustomAttribute<JsonPropertyNameAttribute>(true) with
@@ -133,14 +134,14 @@ module internal Naming =
         match
             case.GetCustomAttributes(typeof<JsonNameAttribute>)
             |> Seq.cast<JsonNameAttribute>
-            |> Seq.tryFind (fun a -> obj.ReferenceEquals(a.Field, null))
+            |> Seq.tryFind (fun a -> isNull (box a.Field))
         with
         | Some attribute -> toNode attribute.Name
         | None -> text (convert options.UnionTagNamingPolicy case.Name)
 
     let private isGeneratedFieldName (name: string) =
         name = "Item"
-        || (name.StartsWith "Item"
+        || (name.StartsWith("Item", StringComparison.Ordinal)
             && name.Length > 4
             && Seq.forall Char.IsDigit (name.Substring 4))
 
@@ -159,8 +160,10 @@ module internal Naming =
         (case: UnionCaseInfo)
         (field: PropertyInfo)
         =
+        let encoding = options.UnionEncoding
+
         let namedFromType (field: PropertyInfo) =
-            options.UnionEncoding.HasFlag JsonUnionEncoding.UnionFieldNamesFromTypes
+            encoding.HasFlag JsonUnionEncoding.UnionFieldNamesFromTypes
             && isGeneratedFieldName field.Name
             && (fieldJsonName case field).IsNone
 
@@ -176,7 +179,7 @@ module internal Naming =
 
                     if sameType.Length > 1 then
                         let index = sameType |> Array.findIndex (fun f -> f.Name = field.Name)
-                        $"{field.PropertyType.Name}{index + 1}"
+                        $"%s{field.PropertyType.Name}%d{index + 1}"
                     else
                         field.PropertyType.Name
                 else

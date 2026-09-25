@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 # Test results and coverage reports
 TestReport/
 artifacts/
+
+# F# analysis restore folder and reports
+/fsharp-analysis-results/
+/eng/fsharp-analysis/.packages/

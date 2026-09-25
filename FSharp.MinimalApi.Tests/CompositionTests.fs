@@ -9,7 +9,8 @@ open FSharp.MinimalApi.Builder
 open Harness
 
 let private routesOf (app: TestApp) =
-  app.Endpoints |> List.map (fun e -> "/" + e.RoutePattern.RawText.TrimStart('/'))
+  app.Endpoints
+  |> List.map (fun e -> "/" + (nonNull e.RoutePattern.RawText).TrimStart('/'))
 
 let private answers (app: TestApp) (url: string) =
   task {
@@ -18,7 +19,8 @@ let private answers (app: TestApp) (url: string) =
   }
 
 /// Echoes its own path, so a request proves which endpoint answered.
-let private echo = fun (ctx: {| ctx: HttpContext |}) -> string ctx.ctx.Request.Path
+let private echo =
+  fun (ctx: {| ctx: HttpContext |}) -> string<PathString> ctx.ctx.Request.Path
 
 type Marker(name: string) =
   member _.Name = name

@@ -22,16 +22,16 @@ type TeapotFilter() =
 type RecordingFilter(calls: Calls) =
   interface IEndpointFilter with
     member _.InvokeAsync(ctx, next) =
-      calls.Add $"before {ctx.HttpContext.Request.Path}"
+      calls.Add $"before %O{ctx.HttpContext.Request.Path}"
       next.Invoke ctx
 
 let private hello = fun () -> "hello"
 
 let private upper =
-  fun (ctx: EndpointFilterInvocationContext) (next: EndpointFilterInvocationContext -> ValueTask<obj>) ->
+  fun (ctx: EndpointFilterInvocationContext) (next: EndpointFilterInvocationContext -> ValueTask<objnull>) ->
     task {
       let! result = next ctx
-      return box ((string result).ToUpperInvariant())
+      return box ((string<objnull> result).ToUpperInvariant())
     }
 
 [<Fact>]
@@ -42,7 +42,7 @@ let ``filter with a function returning ValueTask`` () =
         endpoints {
           filter (fun ctx next ->
             if ctx.HttpContext.Request.Query.ContainsKey "stop" then
-              ValueTask<obj>(Results.NoContent())
+              ValueTask<objnull>(Results.NoContent())
             else
               next ctx)
 
@@ -125,7 +125,7 @@ let ``filters see the bound arguments`` () =
         endpoints {
           filter (fun ctx next ->
             match ctx.Arguments[0] with
-            | :? {| id: int |} as req when req.id < 0 -> ValueTask<obj>(Results.BadRequest "negative")
+            | :? {| id: int |} as req when req.id < 0 -> ValueTask<objnull>(Results.BadRequest "negative")
             | _ -> next ctx)
 
           get "/items/{id}" (fun (req: {| id: int |}) -> req.id)
@@ -144,7 +144,7 @@ let ``outer filters run before inner filters`` () =
     let order = Calls()
 
     let mark name =
-      fun (ctx: EndpointFilterInvocationContext) (next: EndpointFilterInvocationContext -> ValueTask<obj>) ->
+      fun (ctx: EndpointFilterInvocationContext) (next: EndpointFilterInvocationContext -> ValueTask<objnull>) ->
         order.Add name
         next ctx
 

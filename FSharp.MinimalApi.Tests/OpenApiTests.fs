@@ -52,9 +52,10 @@ type Coded =
 
 type Wrap = Wrap of Payload
 
+// Unnamed fields are what the Item and field-names-from-types encodings describe.
 type Point =
-  | Point of int * string * int
-  | Labeled of x: int * int
+  | Point of int * string * int // fsharpanalyzer: ignore-line IONIDE-004
+  | Labeled of x: int * int // fsharpanalyzer: ignore-line IONIDE-004
   | Origin
 
 type UserId = UserId of int
@@ -177,6 +178,7 @@ let encodings =
       "Map as object", JsonFSharpOptions.Default().WithMapFormat(MapFormat.Object)
     ]
 
+[<NoComparison>]
 type Api =
   {
     Document: JsonNode
@@ -201,22 +203,35 @@ let createApiFor<'T> (fsharpOptions: JsonFSharpOptions) (sample: 'T) =
 
     return
       {
-        Document = JsonNode.Parse text |> Option.ofObj |> Option.get
+        Document = nonNull (JsonNode.Parse text)
         Serializer = app.Services.GetRequiredService<IOptions<JsonOptions>>().Value.SerializerOptions
       }
   }
 
 let createApi fsharpOptions = createApiFor fsharpOptions samples.Head
 
+/// The named child of a JSON node, which the test expects to be present.
+let child (name: string) (node: JsonNode) = nonNull node[name]
+
 let componentSchemas (api: Api) =
   match api.Document["components"] with
   | null -> JsonObject()
-  | components -> components["schemas"].AsObject()
+  | components -> (child "schemas" components).AsObject()
 
 /// The response schema as a standalone JSON Schema, with components as $defs.
 let responseSchema (api: Api) =
   let response =
-    api.Document["paths"].["/sample"].["get"].["responses"].["200"].["content"].["application/json"].["schema"]
+    [
+      "paths"
+      "/sample"
+      "get"
+      "responses"
+      "200"
+      "content"
+      "application/json"
+      "schema"
+    ]
+    |> List.fold (fun node name -> child name node) api.Document
 
   let root = JsonObject()
   root["$schema"] <- JsonValue.Create "https://json-schema.org/draft/2020-12/schema"
@@ -231,9 +246,12 @@ let validate (schema: JsonSchema) (json: string) =
     schema.Evaluate(document.RootElement, EvaluationOptions(OutputFormat = OutputFormat.List))
 
   let failures =
-    results.Details
-    |> Seq.filter (fun d -> not d.IsValid && not (isNull d.Errors) && d.Errors.Count > 0)
-    |> Seq.map (fun d -> $"{d.InstanceLocation} @ {d.EvaluationPath}: %A{List.ofSeq d.Errors.Values}")
+    nonNull results.Details
+    |> Seq.choose (fun d ->
+      match d.Errors with
+      | null -> None
+      | errors when d.IsValid || errors.Count = 0 -> None
+      | errors -> Some $"%O{d.InstanceLocation} @ %O{d.EvaluationPath}: %A{List.ofSeq errors.Values}")
     |> String.concat "\n"
 
   results.IsValid, failures
@@ -250,10 +268,10 @@ let ``serialized values match the schema for every encoding`` (encoding: string)
     for sample in samples do
       let json = JsonSerializer.Serialize(sample, api.Serializer)
       let valid, details = validate schema json
-      Assert.True(valid, $"Serialized sample does not match the schema.\nJSON: {json}\nErrors: {details}")
+      Assert.True(valid, $"Serialized sample does not match the schema.\nJSON: %s{json}\nErrors: %s{details}")
 
     for KeyValue(id, definition) in componentSchemas api do
-      Assert.True(definition.AsObject().Count > 0, $"Component '{id}' is an empty schema")
+      Assert.True((nonNull definition).AsObject().Count > 0, $"Component '%s{id}' is an empty schema")
   }
 
 [<Fact>]
@@ -261,7 +279,9 @@ let ``rejects JSON that does not match the F# types`` () =
   task {
     let! api = createApi (JsonFSharpOptions.Default())
     let schema = responseSchema api
-    let json = JsonSerializer.SerializeToNode(samples.Head, api.Serializer).AsObject()
+
+    let json =
+      (nonNull (JsonSerializer.SerializeToNode(samples.Head, api.Serializer))).AsObject()
 
     let mutate (change: JsonObject -> unit) =
       let copy = json.DeepClone().AsObject()
@@ -279,37 +299,44 @@ let ``rejects JSON that does not match the F# types`` () =
 
     for case, text in invalid do
       let valid, _ = validate schema text
-      Assert.False(valid, $"Expected '{case}' to be rejected: {text}")
+      Assert.False(valid, $"Expected '%s{case}' to be rejected: %s{text}")
   }
 
 [<Fact>]
 let ``marks option fields optional and nullable`` () =
   task {
     let! api = createApi (JsonFSharpOptions.Default())
-    let sample = (componentSchemas api)["Sample"]
-    let required = sample["required"].AsArray() |> Seq.map string |> Set.ofSeq
+    let sample = componentSchemas api |> child "Sample"
+
+    let required =
+      (child "required" sample).AsArray()
+      |> Seq.map string<JsonNode | null>
+      |> Set.ofSeq
 
     Assert.True(required.Contains "name", "name is required")
     Assert.False(required.Contains "nick", "an option field is not required")
     Assert.False(required.Contains "maybe", "a Skippable field is not required")
-    Assert.Equal("""{"type":["null","string"]}""", sample["properties"].["nick"].ToJsonString())
+    Assert.Equal("""{"type":["null","string"]}""", (sample |> child "properties" |> child "nick").ToJsonString())
   }
 
 [<Fact>]
 let ``names record fields the way they are serialized`` () =
   task {
     let! api = createApi (JsonFSharpOptions.Default())
-    let json = JsonSerializer.SerializeToNode(samples.Head, api.Serializer).AsObject()
-    let sample = (componentSchemas api)["Sample"]
-    let properties = sample["properties"].AsObject()
+
+    let json =
+      (nonNull (JsonSerializer.SerializeToNode(samples.Head, api.Serializer))).AsObject()
+
+    let sample = componentSchemas api |> child "Sample"
+    let properties = (child "properties" sample).AsObject()
 
     for name in [ "aka"; "custom" ] do
-      Assert.True(json.ContainsKey name, $"'{name}' is serialized")
-      Assert.True(properties.ContainsKey name, $"'{name}' is described")
+      Assert.True(json.ContainsKey name, $"'%s{name}' is serialized")
+      Assert.True(properties.ContainsKey name, $"'%s{name}' is described")
 
     for name in [ "hidden"; "alias"; "original" ] do
-      Assert.False(json.ContainsKey name, $"'{name}' is not serialized")
-      Assert.False(properties.ContainsKey name, $"'{name}' is not described")
+      Assert.False(json.ContainsKey name, $"'%s{name}' is not serialized")
+      Assert.False(properties.ContainsKey name, $"'%s{name}' is not described")
   }
 
 [<Fact>]
@@ -319,7 +346,7 @@ let ``describes maps keyed by single-case unions as objects`` () =
     let! api = createApiFor (JsonFSharpOptions.Default()) sample
     let json = JsonSerializer.Serialize(sample, api.Serializer)
     let valid, details = validate (responseSchema api) json
-    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.True(valid, $"JSON: %s{json}\nErrors: %s{details}")
     Assert.StartsWith("{", json)
   }
 
@@ -327,7 +354,7 @@ let ``describes maps keyed by single-case unions as objects`` () =
 let ``describes single-case unions as their wrapped value`` () =
   task {
     let! api = createApi (JsonFSharpOptions.Default())
-    let email = (componentSchemas api)["Email"]
+    let email = componentSchemas api |> child "Email"
     Assert.Equal("""{"type":"string"}""", email.ToJsonString())
   }
 
@@ -338,14 +365,14 @@ let ``describes maps keyed by other unions as arrays of pairs`` () =
     let! api = createApiFor (JsonFSharpOptions.Default()) sample
     let json = JsonSerializer.Serialize(sample, api.Serializer)
     let valid, details = validate (responseSchema api) json
-    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.True(valid, $"JSON: %s{json}\nErrors: %s{details}")
     Assert.StartsWith("[", json)
 
     let keyedByCase = Map [ Origin, 1; Labeled(1, 2), 2 ]
     let! api = createApiFor (JsonFSharpOptions.Default()) keyedByCase
     let json = JsonSerializer.Serialize(keyedByCase, api.Serializer)
     let valid, details = validate (responseSchema api) json
-    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.True(valid, $"JSON: %s{json}\nErrors: %s{details}")
     Assert.StartsWith("[", json)
   }
 
@@ -394,3 +421,107 @@ let ``AddFSharp explains missing JSON converter before schema generation`` () =
 
   Assert.Contains("ConfigureHttpJsonOptions", error.Message)
   Assert.Contains("FSharp.SystemTextJson", error.Message)
+
+let private mismatchedOptions scenario =
+  let options = JsonFSharpOptions.Default()
+
+  match scenario with
+  | "encoding" -> options.WithUnionExternalTag()
+  | "types" -> options.WithTypes(JsonFSharpTypes.Records)
+  | "map" -> options.WithMapFormat(MapFormat.ArrayOfPairs)
+  | "tag" -> options.WithUnionTagName("kind")
+  | _ -> invalidArg (nameof scenario) "Unknown configuration scenario."
+
+[<Theory>]
+[<InlineData("encoding")>]
+[<InlineData("types")>]
+[<InlineData("map")>]
+[<InlineData("tag")>]
+let ``AddFSharp explains mismatched JSON options`` scenario =
+  let openApiOptions = OpenApiOptions()
+  openApiOptions.AddFSharp() |> ignore
+
+  let serializerOptions =
+    JsonSerializerOptions(TypeInfoResolver = DefaultJsonTypeInfoResolver())
+
+  (mismatchedOptions scenario).AddToJsonSerializerOptions serializerOptions
+
+  let error =
+    Assert.Throws<InvalidOperationException>(fun () ->
+      openApiOptions.CreateSchemaReferenceId.Invoke(serializerOptions.GetTypeInfo(typeof<Payload>))
+      |> ignore)
+
+  Assert.Contains("do not match", error.Message)
+  Assert.Contains("ConfigureHttpJsonOptions", error.Message)
+  Assert.Contains("AddFSharp", error.Message)
+
+[<Fact>]
+let misconfiguredDocumentProbe () =
+  task {
+    // Only the subprocess enters the dangerous path; the normal suite never risks a stack overflow.
+    match Environment.GetEnvironmentVariable "FSMAPI_JSON_CONFIGURATION_PROBE" with
+    | null -> ()
+    | scenario ->
+      use! app =
+        startWith
+          (fun services ->
+            if scenario <> "missing" then
+              services.ConfigureHttpJsonOptions(fun o ->
+                (mismatchedOptions scenario).AddToJsonSerializerOptions o.SerializerOptions)
+              |> ignore
+
+            services.AddOpenApi(fun o -> o.AddFSharp() |> ignore) |> ignore)
+          (fun app ->
+            app.MapOpenApi() |> ignore
+            app.MapGet("/sample", Func<Sample>(fun () -> samples.Head)) |> ignore)
+
+      let! error =
+        Assert.ThrowsAsync<InvalidOperationException>(fun () ->
+          app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
+          :> System.Threading.Tasks.Task)
+
+      Assert.Contains("FSharp.SystemTextJson", error.Message)
+      Assert.Contains("ConfigureHttpJsonOptions", error.Message)
+      Assert.Contains("AddFSharp", error.Message)
+      Console.WriteLine("FSMAPI-9: caught expected InvalidOperationException")
+  }
+
+[<Theory>]
+[<InlineData("missing")>]
+[<InlineData("encoding")>]
+[<InlineData("types")>]
+[<InlineData("map")>]
+[<InlineData("tag")>]
+let ``misconfigured document fails safely in an isolated process`` scenario =
+  task {
+    let startInfo = System.Diagnostics.ProcessStartInfo("dotnet")
+    startInfo.UseShellExecute <- false
+    startInfo.RedirectStandardOutput <- true
+    startInfo.RedirectStandardError <- true
+    startInfo.ArgumentList.Add(typeof<Sample>.Assembly.Location)
+    startInfo.ArgumentList.Add("-method")
+    startInfo.ArgumentList.Add("OpenApiTests.misconfiguredDocumentProbe")
+    startInfo.Environment["FSMAPI_JSON_CONFIGURATION_PROBE"] <- scenario
+    use child = new System.Diagnostics.Process(StartInfo = startInfo)
+    Assert.True(child.Start())
+
+    let stdout =
+      child.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken)
+
+    let stderr =
+      child.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken)
+
+    try
+      do!
+        child
+          .WaitForExitAsync(TestContext.Current.CancellationToken)
+          .WaitAsync(TimeSpan.FromSeconds 30., TestContext.Current.CancellationToken)
+    finally
+      if not child.HasExited then
+        child.Kill(true)
+
+    let! output = stdout
+    let! errors = stderr
+    Assert.True(child.ExitCode = 0, $"Probe '%s{scenario}' exited with %d{child.ExitCode}:\n%s{output}\n%s{errors}")
+    Assert.Contains("FSMAPI-9: caught expected InvalidOperationException", output)
+  }

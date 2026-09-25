@@ -13,3 +13,9 @@ module internal HttpMethodName =
 
     [<Literal>]
     let Delete = "delete"
+
+    [<Literal>]
+    let Patch = "patch"
+
+    [<Literal>]
+    let Methods = "methods"

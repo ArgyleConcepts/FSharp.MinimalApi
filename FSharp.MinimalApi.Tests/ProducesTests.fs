@@ -3,8 +3,13 @@ module ProducesTests
 open System
 open System.Net
 open System.Net.Http
+open System.Text
+open System.Text.Json.Nodes
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.HttpResults
+open Microsoft.Extensions.DependencyInjection
 open Xunit
 open FSharp.MinimalApi.Builder
 open Harness
@@ -64,7 +69,8 @@ let statusOf case = fst declared[case - 1]
 
 type Case = {| case: int |}
 
-let private unexpected (req: Case) : 'a = failwith $"unexpected case {req.case}"
+let private unexpected (req: Case) : 'a =
+  failwith $"unexpected case %d{req.case}"
 
 type Arity11 = Results<R1, R2, R3, R4, R5, Results<R6, R7, R8, R9, R10, R11>>
 
@@ -199,7 +205,7 @@ let arities = TheoryData<int>([ 1..11 ])
 let ``produces declares every result type`` (arity: int) =
   task {
     use! app = serve routes
-    let e = endpoint app "GET" $"/arity/{arity}"
+    let e = endpoint app "GET" $"/arity/%d{arity}"
     Assert.Equal<(int * Type) list>(expectedFor arity, producedBy e)
   }
 
@@ -210,7 +216,7 @@ let ``produces handlers can return every declared result`` (arity: int) =
     use! app = serve routes
 
     for case in 1..arity do
-      let! response = get app $"/arity/{arity}?case={case}"
+      let! response = get app $"/arity/%d{arity}?case=%d{case}"
       let! _ = expect (enum<HttpStatusCode>(statusOf case)) response
       ()
   }
@@ -219,7 +225,7 @@ type Id = {| id: int |}
 
 let private found (req: Id) : Results<Ok<string>, NotFound> =
   if req.id > 0 then
-    !!(Ok $"found {req.id}")
+    !!(Ok $"found %d{req.id}")
   else
     !!NotFound()
 
@@ -256,12 +262,12 @@ let verbsAndShapes =
 let ``produces works for every verb and handler shape`` (verb: string, shape: string) =
   task {
     use! app = serve shapes
-    let e = endpoint app verb $"/{shape}/{{id}}"
+    let e = endpoint app verb $"/%s{shape}/{{id}}"
     Assert.Equal<(int * Type) list>([ 200, typeof<string>; 404, typeof<Void> ], producedBy e)
 
-    let! found = send app (request (HttpMethod verb) $"/{shape}/5")
+    let! found = send app (request (HttpMethod verb) $"/%s{shape}/5")
     do! expectBody HttpStatusCode.OK "\"found 5\"" found
-    let! missing = send app (request (HttpMethod verb) $"/{shape}/0")
+    let! missing = send app (request (HttpMethod verb) $"/%s{shape}/0")
     do! expectBody HttpStatusCode.NotFound "" missing
   }
 
@@ -278,9 +284,9 @@ let ``produces works with parameterless handlers`` () =
       )
 
     for shape in [ "sync"; "task"; "async" ] do
-      Assert.Equal<(int * Type) list>([ 200, typeof<string> ], producedBy (endpoint app "GET" $"/{shape}"))
-      let! response = get app $"/{shape}"
-      do! expectBody HttpStatusCode.OK $"\"{shape}\"" response
+      Assert.Equal<(int * Type) list>([ 200, typeof<string> ], producedBy (endpoint app "GET" $"/%s{shape}"))
+      let! response = get app $"/%s{shape}"
+      do! expectBody HttpStatusCode.OK $"\"%s{shape}\"" response
   }
 
 [<Fact>]
@@ -300,6 +306,108 @@ let ``handlers without produces declare only what the result type provides`` () 
     do! expectBody HttpStatusCode.OK "\"typed\"" typed
     let! untyped = get app "/untyped"
     do! expectBody HttpStatusCode.OK "\"untyped\"" untyped
+  }
+
+let private namedResult (req: Id) : Task<Results<Ok<string>, NotFound>> =
+  task {
+    if req.id > 0 then
+      return Results2.first (Ok(sprintf "found %d" req.id))
+    else
+      return Results2.second (NotFound())
+  }
+
+let private namedSync (req: Id) : Results<Ok<string>, NotFound> =
+  if req.id > 0 then
+    Results2.first (Ok(sprintf "found %d" req.id))
+  else
+    Results2.second (NotFound())
+
+let private namedAsync (req: Id) : Async<Results<Ok<string>, NotFound>> = async { return namedSync req }
+
+let private requiredValue value =
+  match value with
+  | Some value -> value
+  | None -> failwith "Expected a value"
+
+let private requiredProperty (node: JsonNode) (key: string) =
+  node[key] |> Option.ofObj |> requiredValue
+
+[<Fact>]
+let ``named handlers need no phantom result and retain response metadata`` () =
+  task {
+    use! app =
+      startWith (fun services -> services.AddOpenApi() |> ignore) (fun app ->
+        app.MapOpenApi() |> ignore
+
+        let routes =
+          endpoints {
+            get "/named/{id}" namedResult
+            get "/sync/{id}" namedSync
+            get "/async/{id}" namedAsync
+          }
+
+        routes.Apply app |> ignore)
+
+    for shape in [ "named"; "sync"; "async" ] do
+      let route = sprintf "/%s/{id}" shape
+      Assert.Equal<(int * Type) list>([ 200, typeof<string>; 404, typeof<Void> ], producedBy (endpoint app "GET" route))
+      let! found = get app (sprintf "/%s/5" shape)
+      do! expectBody HttpStatusCode.OK "\"found 5\"" found
+      let! missing = get app (sprintf "/%s/0" shape)
+      do! expectBody HttpStatusCode.NotFound "" missing
+
+      let! document =
+        app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
+
+      let json = JsonNode.Parse(document) |> Option.ofObj |> requiredValue
+
+      let responses =
+        [ "paths"; route; "get"; "responses" ] |> List.fold requiredProperty json
+
+      Assert.NotNull(responses["200"])
+      Assert.NotNull(responses["404"])
+  }
+
+type RawJsonResult(bytes: byte array) =
+  interface IResult with
+    member _.ExecuteAsync(context) =
+      task {
+        context.Response.ContentType <- "application/json"
+        do! context.Response.Body.WriteAsync(ReadOnlyMemory<byte>(bytes), context.RequestAborted)
+      }
+      :> Task
+
+let private rawJson (req: Id) : Results<RawJsonResult, NotFound> =
+  if req.id > 0 then
+    Results2.first (RawJsonResult(Encoding.UTF8.GetBytes("{\"id\":1}")))
+  else
+    Results2.second (NotFound())
+
+[<Fact>]
+let ``custom IResult writes exact pre-serialized bytes`` () =
+  task {
+    use! app =
+      serve (
+        endpoints {
+          get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, typeof<obj>, "application/json"))
+        }
+      )
+
+    Assert.Equal<(int * Type) list>(
+      [ 200, typeof<obj>; 404, typeof<Void> ],
+      producedBy (endpoint app "GET" "/raw/{id}")
+    )
+
+    let! response = get app "/raw/1"
+
+    let! actual =
+      response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+    Assert.Equal<byte>(Encoding.UTF8.GetBytes("{\"id\":1}"), actual)
+    Assert.Equal("application/json", (response.Content.Headers.ContentType |> Option.ofObj |> requiredValue).MediaType)
+    let! missing = get app "/raw/0"
+    do! expectBody HttpStatusCode.NotFound "" missing
   }
 
 // The builder only reads the type from produces<...>, it never calls it for a value.

@@ -5,4 +5,45 @@
     <FSharpCoreImplicitPackageVersion>$(ArgyleFSharpCoreVersion)</FSharpCoreImplicitPackageVersion>
     <ContinuousIntegrationBuild Condition="'$(TF_BUILD)' == 'True'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
+
+  <!-- Strict compiler settings for every project. -->
+  <PropertyGroup>
+    <!-- C# nullable reference types; for F# this also turns on the compiler's nullness checks (checknulls). -->
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.fsproj'">
+    <WarningLevel>5</WarningLevel>
+    <OtherFlags>$(OtherFlags) --warnon:0052 --warnon:1178 --warnon:3389 --warnon:3390 --warnon:3559 --warnon:3570 --warnon:3579 --warnon:3582 --warnon:3878</OtherFlags>
+    <WarningsAsErrors>$(WarningsAsErrors);FS0052;FS1178;FS3389;FS3390;FS3559;FS3570;FS3579;FS3582;FS3878</WarningsAsErrors>
+    <NoWarn>$(NoWarn);FS3180;FS3366;FS3388;FS3395;FS3517;FS3560</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(MSBuildProjectName)' != 'AnalyzerPackages'">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.259">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="18.7.23">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)eng/analyzers/BannedSymbols.All.txt" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)eng/analyzers/BannedSymbols.Production.txt" />
+  </ItemGroup>
+
+  <!-- The Interop assembly ships inside the Core package, so its public API is tracked. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'FSharp.MinimalApi.Interop'">
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>

@@ -2,6 +2,7 @@ open System
 open System.ComponentModel
 open System.Linq
 open System.Text.Json.Serialization
+open System.Threading.Tasks
 open BasicApi
 open BasicApi.Db
 open BasicApi.Models
@@ -31,6 +32,7 @@ let otherRoute =
             | _ -> UnionValue.Nothing)
     }
 
+[<NoComparison>]
 type CustomParams =
     { [<FromRoute>]
       foo: int
@@ -39,11 +41,20 @@ type CustomParams =
       [<FromServices>]
       logger: ILogger<MyDbContext> }
 
+let getUser (req: {| userId: Guid; db: MyDbContext |}) : Task<Results<Ok<User>, NotFound>> =
+    task {
+        let! res = req.db.Users.Where(fun x -> x.Id = UserId req.userId).TryFirstAsync()
+
+        match res with
+        | Some user -> return Results2.first (Ok user)
+        | None -> return Results2.second (NotFound())
+    }
+
 let routes =
     endpoints {
         get "/hello" (fun () -> "world")
 
-        get "/ping/{x}" (fun (req: {| x: int |}) -> $"pong {req.x}")
+        get "/ping/{x}" (fun (req: {| x: int |}) -> $"pong %d{req.x}")
 
         get "/inc/{v:int}" (fun (req: {| v: int; n: Nullable<int> |}) -> req.v + (req.n.GetValueOrDefault 1))
 
@@ -55,7 +66,7 @@ let routes =
 
         get "/params/{foo}" (fun (param: CustomParams) ->
             param.logger.LogInformation "Hello Params"
-            $"route={param.foo}; query={param.bar}")
+            $"route=%d{param.foo}; query=%s{param.bar}")
 
         // using options from DI
         get "/settings" (fun (req: {| options: IOptions<MyCustomSettings> |}) -> req.options.Value)
@@ -67,11 +78,11 @@ let routes =
             get "/" (fun (n: int) -> n - 1)
         }
 
-        get "/even/{v}" produces<Ok<string>, BadRequest> (fun (req: {| v: int; logger: ILogger<_> |}) ->
+        get "/even/{v}" produces<Ok<string>, BadRequest> (fun (req: {| v: int; logger: ILogger<obj> |}) ->
             (if req.v % 2 = 0 then
                  !!Ok("even number!")
              else
-                 req.logger.LogInformation $"Odd number: {req.v}"
+                 req.logger.LogInformation $"Odd number: %d{req.v}"
                  !!BadRequest()))
 
         get "/delay/{n}" produces<NoContent> (fun (req: {| n: int |}) ->
@@ -89,25 +100,44 @@ let routes =
             filter (fun ctx next ->
                 task {
                     if ctx.HttpContext.Request.Headers.Authorization.ToString() = "BAD" then
-                        return UnprocessableEntity() :> obj
+                        return UnprocessableEntity() :> objnull
                     else
                         return! next ctx
                 })
 
-            get "/" produces<Ok<User[]>> (fun (req: {| db: MyDbContext |}) ->
+            get "/" produces<Ok<User array>> (fun (req: {| db: MyDbContext |}) ->
                 task {
                     let! users = req.db.Users.ToArrayAsync()
                     return Ok(users)
                 })
 
-            get "/{userId}" produces<Ok<User>, NotFound> (fun (req: {| userId: Guid; db: MyDbContext |}) ->
-                task {
-                    let! res = req.db.Users.Where(fun x -> x.Id = UserId req.userId).TryFirstAsync()
+            get "/{userId}" getUser
 
-                    match res with
-                    | Some user -> return !!Ok(user)
-                    | None -> return !!NotFound()
-                })
+            patch
+                "/{userId}/name"
+                produces<Ok<User>, NotFound, ValidationProblem>
+                (fun
+                    (req:
+                        {| userId: Guid
+                           rename: RenameUser
+                           db: MyDbContext |}) ->
+                    task {
+                        let! existing = req.db.Users.TryFirstAsync(fun x -> x.Id = UserId req.userId)
+
+                        match existing with
+                        | None -> return !!NotFound()
+                        | Some user ->
+                            let nameErrors = UserName.errors req.rename.Name
+
+                            if nameErrors.Length > 0 then
+                                return !!ValidationProblem(dict [ nameof req.rename.Name, nameErrors ])
+                            else
+                                let changed = { user with Name = req.rename.Name }
+                                req.db.Entry(user).CurrentValues.SetValues(changed)
+                                do! req.db.saveChangesAsync ()
+                                return !!Ok(changed)
+                    })
+                (fun (b: RouteHandlerBuilder) -> b.WithName("rename-user").WithSummary("Rename a user"))
 
             route "profile" {
                 allowAnonymous
@@ -127,7 +157,7 @@ let routes =
                                 | None ->
                                     req.db.Users.add newUser
                                     do! req.db.saveChangesAsync ()
-                                    return !!Created($"/user/{newUser.Id.Value}", newUser)
+                                    return !!Created($"/user/%O{newUser.Id.Value}", newUser)
                         })
 
                 delete "/{userId}" produces<NoContent, NotFound> (fun (req: {| userId: Guid; db: MyDbContext |}) ->

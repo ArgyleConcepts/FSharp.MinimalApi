@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Primitives
 open Xunit
 open FSharp.MinimalApi.Builder
 open Harness
@@ -20,11 +21,11 @@ type HeaderAuthentication(options, logger, encoder) =
   inherit AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 
   override this.HandleAuthenticateAsync() =
-    match string this.Request.Headers["X-User"] with
-    | "" -> Task.FromResult(AuthenticateResult.NoResult())
+    match string<StringValues> this.Request.Headers["X-User"] with
+    | user when user.Length = 0 -> Task.FromResult(AuthenticateResult.NoResult())
     | user ->
       let roles =
-        (string this.Request.Headers["X-Roles"]).Split(',', System.StringSplitOptions.RemoveEmptyEntries)
+        (string<StringValues> this.Request.Headers["X-Roles"]).Split(',', System.StringSplitOptions.RemoveEmptyEntries)
 
       let claims =
         Claim(ClaimTypes.Name, user)
@@ -72,10 +73,9 @@ let private expectStatus (app: TestApp) user url (status: HttpStatusCode) =
 
 let private whoAmI =
   fun (req: {| user: ClaimsPrincipal |}) ->
-    if isNull req.user.Identity.Name then
-      "anonymous"
-    else
-      req.user.Identity.Name
+    match (nonNull req.user.Identity).Name with
+    | null -> "anonymous"
+    | name -> name
 
 [<Fact>]
 let ``requireAuthorization requires an authenticated user`` () =

@@ -1,5 +1,107 @@
 root = true
 
+[*.cs]
+# Broad correctness categories
+dotnet_analyzer_diagnostic.category-Security.severity = warning
+dotnet_analyzer_diagnostic.category-Reliability.severity = warning
+dotnet_analyzer_diagnostic.category-Usage.severity = warning
+dotnet_analyzer_diagnostic.category-Interoperability.severity = warning
+
+# Selected design and maintainability correctness
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA1065.severity = warning
+dotnet_diagnostic.CA1508.severity = warning
+dotnet_diagnostic.CA2208.severity = warning
+
+# Explicit culture and string-comparison semantics
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+dotnet_diagnostic.CA1862.severity = warning
+
+# Runtime correctness
+dotnet_diagnostic.CA2002.severity = warning
+dotnet_diagnostic.CA2011.severity = warning
+dotnet_diagnostic.CA2013.severity = warning
+dotnet_diagnostic.CA2014.severity = warning
+dotnet_diagnostic.CA2017.severity = warning
+dotnet_diagnostic.CA2019.severity = warning
+dotnet_diagnostic.CA2021.severity = warning
+dotnet_diagnostic.CA2022.severity = warning
+dotnet_diagnostic.CA2024.severity = warning
+
+# Native interop safety
+dotnet_diagnostic.CA2101.severity = warning
+dotnet_diagnostic.CA5392.severity = warning
+dotnet_diagnostic.CA5393.severity = warning
+dotnet_diagnostic.CA5399.severity = warning
+
+# Deliberately excluded broad or ceremonial rules
+dotnet_diagnostic.CA1031.severity = none
+dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.CA2234.severity = none
+
+# Async correctness
+dotnet_diagnostic.CA2007.severity = warning
+dotnet_diagnostic.CA2000.severity = warning
+dotnet_diagnostic.CA2012.severity = warning
+dotnet_diagnostic.CA2016.severity = warning
+dotnet_diagnostic.CA1068.severity = warning
+dotnet_diagnostic.CA1849.severity = warning
+dotnet_diagnostic.CA2025.severity = warning
+
+# Deferred enumeration and serialization performance
+dotnet_diagnostic.CA1851.severity = warning
+dotnet_diagnostic.CA1854.severity = warning
+dotnet_diagnostic.CA1869.severity = warning
+dotnet_diagnostic.CA1860.severity = warning
+
+# Avoid expensive work for disabled log levels
+dotnet_diagnostic.CA1873.severity = warning
+
+# Resource ownership
+dotnet_diagnostic.CA2213.severity = warning
+
+# Structured logging
+dotnet_diagnostic.CA2254.severity = warning
+
+# Third-party analyzer rules kept for correctness, determinism, and security.
+dotnet_diagnostic.MA0002.severity = warning
+dotnet_diagnostic.MA0009.severity = warning
+dotnet_diagnostic.MA0011.severity = warning
+dotnet_diagnostic.MA0015.severity = warning
+dotnet_diagnostic.MA0158.severity = warning
+dotnet_diagnostic.MA0166.severity = warning
+dotnet_diagnostic.VSTHRD100.severity = warning
+
+# Exclude opinionated naming, formatting, complexity, and redundant async policies.
+dotnet_diagnostic.MA0004.severity = none
+dotnet_diagnostic.MA0006.severity = none
+dotnet_diagnostic.MA0016.severity = none
+dotnet_diagnostic.MA0023.severity = none
+dotnet_diagnostic.MA0026.severity = none
+dotnet_diagnostic.MA0046.severity = none
+dotnet_diagnostic.MA0048.severity = none
+dotnet_diagnostic.MA0049.severity = none
+dotnet_diagnostic.MA0051.severity = none
+dotnet_diagnostic.MA0084.severity = none
+dotnet_diagnostic.MA0127.severity = none
+dotnet_diagnostic.MA0136.severity = none
+# Equality operators are the clearest and conventional comparison for enums and generated value types.
+dotnet_diagnostic.MA0169.severity = none
+dotnet_diagnostic.MA0194.severity = none
+dotnet_diagnostic.VSTHRD003.severity = none
+dotnet_diagnostic.VSTHRD103.severity = none
+dotnet_diagnostic.VSTHRD111.severity = none
+dotnet_diagnostic.VSTHRD200.severity = none
+
+# Targeted security
+dotnet_diagnostic.CA2100.severity = warning
+dotnet_diagnostic.CA5359.severity = warning
+dotnet_diagnostic.CA5390.severity = warning
+dotnet_diagnostic.CA5394.severity = warning
+
 [*.{fs,fsi,fsx}]
 # Keep the formatting style this project used before Fantomas 7 changed the default.
 fsharp_multiline_bracket_style = cramped
+max_line_length = 120

@@ -42,6 +42,9 @@ type BlogPost =
 type NewUser = { Name: string; Email: string }
 
 [<CLIMutable>]
+type RenameUser = { Name: string }
+
+[<CLIMutable>]
 type MyCustomSettings =
     { MagicNumber: int option
       Enabled: bool
@@ -54,14 +57,20 @@ module Email =
         let errors =
             [| if String.IsNullOrWhiteSpace emailStr then
                    "Empty email"
-
-               if not <| emailStr.Contains "@" then
+               if String.IsNullOrEmpty emailStr || not (emailStr.Contains "@") then
                    "Invalid email" |]
 
         if errors |> Array.isEmpty then
             emailStr.ToLower().Trim() |> Email |> Ok
         else
             errors |> Error
+
+module UserName =
+    let errors (name: string) =
+        [| if String.IsNullOrWhiteSpace name then
+               "Empty name"
+           if String.IsNullOrEmpty name || name.Length < 3 then
+               "Short name" |]
 
 module NewUser =
     let parseUser (info: NewUser) =
@@ -70,11 +79,7 @@ module NewUser =
               | Error errors -> nameof info.Email, errors
               | Ok e -> ()
 
-              nameof info.Name,
-              [| if String.IsNullOrWhiteSpace info.Name then
-                     "Empty name"
-                 if info.Name.Length < 3 then
-                     "Short name" |] ]
+              nameof info.Name, UserName.errors info.Name ]
 
         problems
         |> List.filter (fun (_, errs) -> errs.Length > 0)
