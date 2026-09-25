@@ -17,6 +17,7 @@ open FSharp.MinimalApi.Builder
 open Microsoft.Extensions.Options
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.HttpResults
+open Scalar.AspNetCore
 open type TypedResults
 
 let otherRoute =
@@ -171,6 +172,7 @@ let main args =
 
     let app = builder.Build()
     app.MapOpenApi() |> ignore
+    app.MapScalarApiReference() |> ignore
 
     app.MapGroup("api").WithTags("Root") |> routes.Apply |> ignore
 

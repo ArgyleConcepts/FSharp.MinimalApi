@@ -19,6 +19,7 @@
     <ItemGroup>
       <PackageReference Include="FSharp.TypeConverter" Version="1.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
+      <PackageReference Include="Scalar.AspNetCore" Version="2.17.10" />
     </ItemGroup>
 
 </Project>
