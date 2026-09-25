@@ -4,6 +4,7 @@ open System
 open System.Net
 open System.Net.Http
 open System.Text.Json.Nodes
+open System.Threading.Tasks
 open System.Threading.RateLimiting
 open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Builder
@@ -20,6 +21,12 @@ open Harness
 open type TypedResults
 
 let private item (req: {| id: int |}) = Ok req.id
+
+let private requiredMetadata<'T when 'T: not struct and 'T: not null> (mapped: Endpoint) =
+  mapped.Metadata.GetMetadata<'T>() |> Option.ofObj |> Option.get
+
+let private requiredProperty (node: JsonNode) (name: string) =
+  node[name] |> Option.ofObj |> Option.get
 
 [<Fact>]
 let ``PATCH and methods map F# handlers inside groups`` () =
@@ -43,8 +50,8 @@ let ``PATCH and methods map F# handlers inside groups`` () =
         routes.Apply app |> ignore)
 
     let patched = endpoint app "PATCH" "/api/items/{id}"
-    Assert.Equal("patch-item", patched.Metadata.GetMetadata<IEndpointNameMetadata>().EndpointName)
-    Assert.Equal("Patch an item", patched.Metadata.GetMetadata<IEndpointSummaryMetadata>().Summary)
+    Assert.Equal("patch-item", (requiredMetadata<IEndpointNameMetadata> patched).EndpointName)
+    Assert.Equal("Patch an item", (requiredMetadata<IEndpointSummaryMetadata> patched).Summary)
     Assert.Equal<(int * Type) list>([ 200, typeof<int> ], producedBy patched)
     let! response = send app (request HttpMethod.Patch "/api/items/42")
     do! expectBody ok "42" response
@@ -53,7 +60,7 @@ let ``PATCH and methods map F# handlers inside groups`` () =
 
     Assert.Equal<string list>(
       [ "HEAD"; "OPTIONS" ],
-      mapped.Metadata.GetMetadata<IHttpMethodMetadata>().HttpMethods |> List.ofSeq
+      (requiredMetadata<IHttpMethodMetadata> mapped).HttpMethods |> List.ofSeq
     )
 
     for verb in [ HttpMethod.Head; HttpMethod.Options ] do
@@ -67,8 +74,12 @@ let ``PATCH and methods map F# handlers inside groups`` () =
     let! document =
       app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
 
-    let json = JsonNode.Parse(document)
-    Assert.NotNull(json["paths"].["/api/items/{id}"].["patch"].["responses"].["200"])
+    let json = JsonNode.Parse(document) |> Option.ofObj |> Option.get
+
+    [ "paths"; "/api/items/{id}"; "patch"; "responses"; "200" ]
+    |> List.fold requiredProperty json
+    |> Assert.IsType<JsonObject>
+    |> ignore
   }
 
 [<Fact>]
@@ -95,9 +106,12 @@ let ``PATCH and methods keep typed results for sync Task and Async handlers`` ()
         "SEARCH", "task", "methods"
         "PROPFIND", "async", "methods"
       ] do
-      let route = $"/{prefix}/{shape}/{{id}}"
+      let route = sprintf "/%s/%s/{id}" prefix shape
       Assert.Equal<(int * Type) list>([ 200, typeof<int> ], producedBy (endpoint app verb route))
-      let! response = send app (request (HttpMethod verb) $"/{prefix}/{shape}/9")
+
+      let! response =
+        send app (request (HttpMethod verb) (sprintf "/%s/%s/9" prefix shape))
+
       do! expectBody ok "9" response
   }
 
@@ -115,7 +129,7 @@ let ``PATCH and methods accept .NET delegates`` () =
     let! patched = send app (request HttpMethod.Patch "/delegate")
     do! expectBody ok "patched" patched
     let mapped = endpoint app "HEAD" "/delegate"
-    Assert.Equal<string list>([ "HEAD" ], mapped.Metadata.GetMetadata<IHttpMethodMetadata>().HttpMethods |> List.ofSeq)
+    Assert.Equal<string list>([ "HEAD" ], (requiredMetadata<IHttpMethodMetadata> mapped).HttpMethods |> List.ofSeq)
     let! headed = send app (request HttpMethod.Head "/delegate")
     do! expectBody HttpStatusCode.NoContent "" headed
   }
@@ -141,15 +155,15 @@ let ``group policies and per-endpoint configuration retain framework metadata`` 
       )
 
     let mapped = endpoint app "GET" "/api/item"
-    Assert.Equal("get-item", mapped.Metadata.GetMetadata<IEndpointNameMetadata>().EndpointName)
-    Assert.Equal("Get one item", mapped.Metadata.GetMetadata<IEndpointSummaryMetadata>().Summary)
+    Assert.Equal("get-item", (requiredMetadata<IEndpointNameMetadata> mapped).EndpointName)
+    Assert.Equal("Get one item", (requiredMetadata<IEndpointSummaryMetadata> mapped).Summary)
     Assert.Contains(mapped.Metadata.GetOrderedMetadata<IAuthorizeData>(), fun auth -> auth.Policy = "members")
-    Assert.Equal("one", mapped.Metadata.GetMetadata<EnableRateLimitingAttribute>().PolicyName)
+    Assert.Equal("one", (requiredMetadata<EnableRateLimitingAttribute> mapped).PolicyName)
     Assert.NotNull(mapped.Metadata.GetMetadata<IOutputCachePolicy>())
     let other = endpoint app "GET" "/api/other"
-    Assert.Equal("Group summary", other.Metadata.GetMetadata<IEndpointSummaryMetadata>().Summary)
+    Assert.Equal("Group summary", (requiredMetadata<IEndpointSummaryMetadata> other).Summary)
     Assert.Contains(other.Metadata.GetOrderedMetadata<IAuthorizeData>(), fun auth -> auth.Policy = "members")
-    Assert.Equal("one", other.Metadata.GetMetadata<EnableRateLimitingAttribute>().PolicyName)
+    Assert.Equal("one", (requiredMetadata<EnableRateLimitingAttribute> other).PolicyName)
     Assert.NotNull(other.Metadata.GetMetadata<IOutputCachePolicy>())
   }
 
@@ -161,12 +175,10 @@ let ``group filter runs for PATCH without changing other routes`` () =
         endpoints {
           route "filtered" {
             filter (fun ctx next ->
-              task {
-                if ctx.HttpContext.Request.Headers.ContainsKey("X-Block") then
-                  return BadRequest() :> obj
-                else
-                  return! next ctx
-              })
+              if ctx.HttpContext.Request.Headers.ContainsKey("X-Block") then
+                ValueTask<obj>(BadRequest() :> obj)
+              else
+                next ctx)
 
             patch "/item" (fun () -> "patched")
           }

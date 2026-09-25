@@ -54,15 +54,17 @@ module Email =
     let value (Email email) = email
 
     let create (emailStr: string) =
+        let email = emailStr |> Option.ofObj |> Option.defaultValue ""
+
         let errors =
-            [| if String.IsNullOrWhiteSpace emailStr then
+            [| if String.IsNullOrWhiteSpace email then
                    "Empty email"
 
-               if not (isNull emailStr) && not (emailStr.Contains "@") then
+               if not (String.IsNullOrWhiteSpace email) && not (email.Contains "@") then
                    "Invalid email" |]
 
         if errors |> Array.isEmpty then
-            emailStr.ToLower().Trim() |> Email |> Ok
+            email.ToLower().Trim() |> Email |> Ok
         else
             errors |> Error
 
