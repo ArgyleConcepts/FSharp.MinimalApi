@@ -1,0 +1,43 @@
+name: pr-validation-$(Date:yyyyMMdd)$(Rev:.r)
+
+# The GitHub service connection supplies the PR event. Publishing belongs to a
+# separate release pipeline.
+trigger: none
+pr:
+  branches:
+    include:
+      - develop
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+steps:
+  - checkout: self
+
+  - task: UseDotNet@2
+    displayName: Install .NET SDK from global.json
+    inputs:
+      packageType: sdk
+      useGlobalJson: true
+
+  - script: dotnet --version
+    displayName: Show .NET SDK version
+
+  - script: dotnet restore FSharp.MinimalApi.sln
+    displayName: Restore solution
+
+  - script: dotnet tool restore
+    displayName: Restore local tools
+
+  - script: dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
+    displayName: Build solution
+
+  - script: dotnet test FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
+    displayName: Run tests
+
+  - script: dotnet fantomas check .
+    displayName: Check F# formatting

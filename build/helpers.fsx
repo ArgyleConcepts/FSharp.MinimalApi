@@ -130,13 +130,13 @@ let generateCoverageReport () =
 
 
 let fantomasCheck () =
-    let result = DotNet.exec id "fantomas" "-r --check ."
+    let result = DotNet.exec id "fantomas" "check ."
 
     if result.ExitCode <> 0 then
         failwith "Some files need formatting, check output for more info"
 
 let fantomasFormat () =
-    let result = DotNet.exec id "fantomas" "-r ."
+    let result = DotNet.exec id "fantomas" "."
 
     if not result.OK then
         printfn "Errors while formatting all files: %A" result.Messages
