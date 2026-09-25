@@ -2,6 +2,7 @@ open System
 open System.ComponentModel
 open System.Linq
 open System.Text.Json.Serialization
+open System.Threading.Tasks
 open BasicApi
 open BasicApi.Db
 open BasicApi.Models
@@ -39,6 +40,15 @@ type CustomParams =
       bar: string
       [<FromServices>]
       logger: ILogger<MyDbContext> }
+
+let getUser (req: {| userId: Guid; db: MyDbContext |}) : Task<Results<Ok<User>, NotFound>> =
+    task {
+        let! res = req.db.Users.Where(fun x -> x.Id = UserId req.userId).TryFirstAsync()
+
+        match res with
+        | Some user -> return Results2.first (Ok user)
+        | None -> return Results2.second (NotFound())
+    }
 
 let routes =
     endpoints {
@@ -101,14 +111,7 @@ let routes =
                     return Ok(users)
                 })
 
-            get "/{userId}" produces<Ok<User>, NotFound> (fun (req: {| userId: Guid; db: MyDbContext |}) ->
-                task {
-                    let! res = req.db.Users.Where(fun x -> x.Id = UserId req.userId).TryFirstAsync()
-
-                    match res with
-                    | Some user -> return !!Ok(user)
-                    | None -> return !!NotFound()
-                })
+            get "/{userId}" getUser
 
             route "profile" {
                 allowAnonymous
