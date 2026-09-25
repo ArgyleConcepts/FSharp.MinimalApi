@@ -84,7 +84,7 @@ let jsonOf<'a> (response: HttpResponseMessage) =
 let expect (status: HttpStatusCode) (response: HttpResponseMessage) =
   task {
     let! body = bodyOf response
-    Assert.True((status = response.StatusCode), $"Expected {status} but got {response.StatusCode}: {body}")
+    Assert.True((status = response.StatusCode), $"Expected %O{status} but got %O{response.StatusCode}: %s{body}")
     return body
   }
 
@@ -97,26 +97,29 @@ let expectBody (status: HttpStatusCode) (expected: string) (response: HttpRespon
 /// The endpoint mapped for the HTTP method at the route (as written after group prefixes are applied).
 let endpoint (app: TestApp) (httpMethod: string) (route: string) =
   let matches (e: RouteEndpoint) =
-    let methods = e.Metadata.GetMetadata<IHttpMethodMetadata>()
-
-    ("/" + e.RoutePattern.RawText.TrimStart('/')) = route
-    && not (isNull methods)
-    && methods.HttpMethods |> Seq.contains httpMethod
+    match e.Metadata.GetMetadata<IHttpMethodMetadata>() with
+    | null -> false
+    | methods ->
+      ("/" + (nonNull e.RoutePattern.RawText).TrimStart('/')) = route
+      && methods.HttpMethods |> Seq.contains httpMethod
 
   match app.Endpoints |> List.filter matches with
   | [ e ] -> e
   | found ->
     let all =
       app.Endpoints
-      |> List.map (fun e -> $"{e.RoutePattern.RawText} {e.DisplayName}")
+      |> List.map (fun e -> $"%s{e.RoutePattern.RawText} %s{e.DisplayName}")
       |> String.concat "\n"
 
-    failwith $"Expected one {httpMethod} {route} endpoint but found {found.Length}. Mapped:\n{all}"
+    failwith $"Expected one %s{httpMethod} %s{route} endpoint but found %d{found.Length}. Mapped:\n%s{all}"
 
 /// Status code and body type of every response the endpoint declares.
 let producedBy (e: Endpoint) =
   e.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Http.Metadata.IProducesResponseTypeMetadata>()
-  |> Seq.map (fun m -> m.StatusCode, (if isNull m.Type then typeof<Void> else m.Type))
+  |> Seq.map (fun m ->
+    match m.Type with
+    | null -> m.StatusCode, typeof<Void>
+    | t -> m.StatusCode, t)
   |> Seq.distinct
   |> Seq.sortBy (fun (status, t) -> status, t.FullName)
   |> List.ofSeq

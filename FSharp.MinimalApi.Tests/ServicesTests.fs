@@ -16,7 +16,7 @@ type B() =
 let private provider () =
   ServiceCollection().AddSingleton<A>().AddSingleton<B>().AddTuples().BuildServiceProvider()
 
-let private resolve<'t> () =
+let private resolve<'t when 't: not null> () =
   use services = provider ()
   services.GetRequiredService<'t>()
 
@@ -34,15 +34,15 @@ let ``AddTuples resolves every tuple size it registers`` () =
 
   let expected: obj list =
     [
-      box (a, b)
-      box (a, b, a)
-      box (a, b, a, b)
-      box (a, b, a, b, a)
-      box (a, b, a, b, a, b)
-      box (a, b, a, b, a, b, a)
-      box (a, b, a, b, a, b, a, b)
-      box (a, b, a, b, a, b, a, b, a)
-      box (a, b, a, b, a, b, a, b, a, b)
+      (a, b) :> obj
+      (a, b, a) :> obj
+      (a, b, a, b) :> obj
+      (a, b, a, b, a) :> obj
+      (a, b, a, b, a, b) :> obj
+      (a, b, a, b, a, b, a) :> obj
+      (a, b, a, b, a, b, a, b) :> obj
+      (a, b, a, b, a, b, a, b, a) :> obj
+      (a, b, a, b, a, b, a, b, a, b) :> obj
     ]
 
   for tuple in expected do

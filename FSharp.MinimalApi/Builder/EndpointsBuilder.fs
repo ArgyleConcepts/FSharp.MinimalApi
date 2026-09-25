@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Routing
 open FSharp.MinimalApi
 
+[<NoEquality; NoComparison>]
 type EndpointsMap =
     internal
         { MapFn: RouteGroupBuilder -> RouteGroupBuilder
@@ -56,7 +57,7 @@ type EndpointsBuilder(?groupName: string) =
             MapFn = state.MapFn >> endpoints.MapFn }
 
     [<CustomOperation("path")>]
-    member _.Path(state, [<ParamArray>] segments: string[]) =
+    member _.Path(state, [<ParamArray>] segments: string array) =
         { state with
             GroupName = segments |> Array.map trimPath |> concatPath |> Some }
 
@@ -86,12 +87,12 @@ type EndpointsBuilder(?groupName: string) =
             MapFn = state.MapFn >> (fun e -> e.RequireAuthorization()) }
 
     [<CustomOperation("requireAuthorization")>]
-    member _.RequireAuth(state, [<ParamArray>] policies: string[]) =
+    member _.RequireAuth(state, [<ParamArray>] policies: string array) =
         { state with
             MapFn = state.MapFn >> (fun e -> e.RequireAuthorization(policies)) }
 
     [<CustomOperation("requireAuthorization")>]
-    member _.RequireAuth(state, [<ParamArray>] policies: IAuthorizeData[]) =
+    member _.RequireAuth(state, [<ParamArray>] policies: IAuthorizeData array) =
         { state with
             MapFn = state.MapFn >> (fun e -> e.RequireAuthorization(policies)) }
 
@@ -114,7 +115,10 @@ type EndpointsBuilder(?groupName: string) =
     member _.Filter
         (
             state,
-            f: EndpointFilterInvocationContext -> (EndpointFilterInvocationContext -> ValueTask<obj>) -> ValueTask<obj>
+            f:
+                EndpointFilterInvocationContext
+                    -> (EndpointFilterInvocationContext -> ValueTask<objnull>)
+                    -> ValueTask<objnull>
         ) =
         let filter =
             { new IEndpointFilter with
@@ -125,11 +129,16 @@ type EndpointsBuilder(?groupName: string) =
 
     [<CustomOperation("filter")>]
     member _.Filter
-        (state, f: EndpointFilterInvocationContext -> (EndpointFilterInvocationContext -> ValueTask<obj>) -> Task<obj>)
-        =
+        (
+            state,
+            f:
+                EndpointFilterInvocationContext
+                    -> (EndpointFilterInvocationContext -> ValueTask<objnull>)
+                    -> Task<objnull>
+        ) =
         let filter =
             { new IEndpointFilter with
-                member _.InvokeAsync(ctx, next) = ValueTask<obj>(f ctx next.Invoke) }
+                member _.InvokeAsync(ctx, next) = ValueTask<objnull>(f ctx next.Invoke) }
 
         { state with
             MapFn = state.MapFn >> (fun e -> e.AddEndpointFilter(filter)) }

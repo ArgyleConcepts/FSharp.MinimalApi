@@ -126,7 +126,7 @@ let main args =
 
 ## Pull request validation
 
-[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through [FSharp.MinimalApi PR Validation](https://dev.azure.com/ArgyleConceptsLLC/Argyle%20Converge/_build?definitionId=33) in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, checks F# formatting with Fantomas, and verifies locally packed packages.
+[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through the **FSharp.MinimalApi PR Validation** pipeline in the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release with warnings as errors, runs the F# analyzers, runs the solution tests, checks F# formatting with Fantomas, and verifies locally packed packages.
 
 To reproduce the validation locally, run these commands from the repository root:
 
@@ -134,6 +134,7 @@ To reproduce the validation locally, run these commands from the repository root
 dotnet restore FSharp.MinimalApi.sln
 dotnet tool restore
 dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
+dotnet fsi eng/fsharp-analysis/Run.fsx
 dotnet test --solution FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
 dotnet fantomas check .
 bash eng/verify-packages.sh
@@ -143,9 +144,23 @@ Maintainer setup:
 
 1. The Azure pipeline uses the existing **ArgyleConcepts** GitHub App service connection and `azure-pipelines.yml`. Confirm that the connection has access to `ArgyleConcepts/FSharp.MinimalApi` and permission to post PR checks; keep its credentials in Azure DevOps. After this YAML is merged, set the pipeline's default branch to `develop`.
 2. Open a PR targeting `develop` and confirm Azure Pipelines starts automatically and posts a successful check. Changes to that PR should start another run.
-3. In the GitHub repository settings, protect `develop` and require the **FSharp.MinimalApi PR Validation** check from Azure Pipelines. Require the branch to be up to date before merging. A failed formatting or test run must block the PR.
+3. In the GitHub repository settings, protect `develop` and require the **FSharp.MinimalApi PR Validation** check from Azure Pipelines. Require the branch to be up to date before merging. A failed build, analysis, formatting or test run must block the PR.
 
 Package publishing remains a separate release decision.
+
+## Analyzers and warnings
+
+- Every project builds with `Nullable` enabled and warnings as errors. For F# projects `Nullable` also turns on the compiler's nullness checks, and warning level 5 plus the opt-in warnings FS0052, FS1178, FS3389, FS3390, FS3559, FS3570, FS3579, FS3582 and FS3878 apply.
+- C# projects use Meziantou.Analyzer, the banned API analyzer with the lists in `eng/analyzers`, and the Visual Studio threading analyzers, with rule severities in `.editorconfig`. The public API analyzer tracks `FSharp.MinimalApi.Interop`, which ships inside the Core package.
+- `eng/fsharp-analysis/Run.fsx` checks that every project is built by the solution, runs the Ionide, G-Research and WoofWare analyzers, bans partial collection and option functions, and runs curated FSharpLint rules. Reports go to `fsharp-analysis-results/`.
+- The package smoke consumer in `eng/PackageSmoke` also builds with nullness checks and warnings as errors.
+
+### Nullness for consumers
+
+The assemblies now carry nullness metadata. Projects that do not enable nullness checks see no change. Projects that do should note:
+
+- `filter` functions receive and return `ValueTask<objnull>` or `Task<objnull>`, because an endpoint result can be null.
+- ASP.NET Core treats non-nullable handler parameters and fields as required. A missing body or header for such a field is a bad request; declare it as `string | null` (or another nullable type) to make it optional.
 
 ## Package build and release readiness
 
