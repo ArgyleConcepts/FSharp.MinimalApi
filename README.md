@@ -258,3 +258,49 @@ $ dotnet test
 ```
 
 `./fake.sh test` also collects coverage and fails when a library assembly drops below 90% line coverage. `./fake.sh lint` checks formatting.
+
+## Handler binding and asynchronous results
+
+An ordinary named F# function with one record or anonymous-record argument is adapted to a Minimal API delegate with `[AsParameters]`. Its fields follow [ASP.NET Core's binding rules](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis/parameter-binding?view=aspnetcore-10.0): route, query, header, body and services can be mixed with `HttpContext` and `CancellationToken`. Custom scalar identifiers can provide `TryParse`; types that need request context can provide `BindAsync`. A failed parse or malformed JSON returns 400, and a body with the wrong media type returns 415. The handler is not called on those failures.
+
+`Task<'T>`, `Async<'T>` and `ValueTask<'T>` handlers retain a concrete result type for ASP.NET Core response metadata, including when used with `produces<...>`. A `ValueTask<unit>` handler returns an empty 200 response, matching `Task<unit>`. A field of type `CancellationToken` receives `HttpContext.RequestAborted`; the `Async` adapter also passes that token to `Async.StartImmediateAsTask`.
+
+```fsharp
+open System.Threading
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.HttpResults
+open FSharp.MinimalApi.Builder
+open type TypedResults
+
+let readItem (req: {| id: int; cancellationToken: CancellationToken |}) : ValueTask<Ok<int>> =
+    ValueTask<Ok<int>>(Ok req.id)
+
+let routes = endpoints { get "/items/{id}" readItem }
+```
+
+For optional numeric query values, use `Nullable<'T>`. A nullable reference field such as `string | null` can receive a missing header as `null`. Bare `option<'T>` and `voption<'T>` fields do **not** currently work as inferred route/query/header scalars: ASP.NET Core infers a body for them, so a GET route fails with `Body was inferred but the method does not allow inferred body parameters`. Use a supported nullable shape or a wrapper with `TryParse`/`BindAsync` instead. These are framework binding rules; the adapter does not deserialize or reinterpret values.
+
+### Trimming and Native AOT
+
+A small .NET 10 app with a named `Task<string>` handler and an anonymous-record route parameter worked after `PublishTrimmed=true` and `TrimMode=partial` on macOS arm64. Partial trimming keeps this library whole because it does not opt in with `IsTrimmable`; this run does not establish full trimming support. The same app published with `PublishAot=true` emitted IL2026 and IL3050 warnings for `MapGet(IEndpointRouteBuilder, string, Delegate)` and returned HTTP 500 for `GET /items/42`: `No public parameterless constructor found` for the F# anonymous record. Full trimming and Native AOT are not supported for this binding path. The adapter also uses `MakeGenericMethod` to dispatch Task, Async and `ValueTask<unit>` return types at runtime.
+
+To reproduce, put this in an F# web project that references `FSharp.MinimalApi`, publish with `dotnet publish -c Release -p:PublishAot=true`, run the native binary, and request `/items/42`:
+
+```fsharp
+module AotSmoke
+
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
+open FSharp.MinimalApi.Builder
+
+let handler (req: {| id: int |}) : Task<string> = task { return string req.id }
+
+[<EntryPoint>]
+let main args =
+    let builder = WebApplication.CreateSlimBuilder(args)
+    let app = builder.Build()
+    (endpoints { get "/items/{id}" handler }).Apply app |> ignore
+    app.Run()
+    0
+```
