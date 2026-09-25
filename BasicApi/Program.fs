@@ -31,6 +31,7 @@ let otherRoute =
             | _ -> UnionValue.Nothing)
     }
 
+[<NoComparison>]
 type CustomParams =
     { [<FromRoute>]
       foo: int
@@ -43,7 +44,7 @@ let routes =
     endpoints {
         get "/hello" (fun () -> "world")
 
-        get "/ping/{x}" (fun (req: {| x: int |}) -> $"pong {req.x}")
+        get "/ping/{x}" (fun (req: {| x: int |}) -> $"pong %d{req.x}")
 
         get "/inc/{v:int}" (fun (req: {| v: int; n: Nullable<int> |}) -> req.v + (req.n.GetValueOrDefault 1))
 
@@ -55,7 +56,7 @@ let routes =
 
         get "/params/{foo}" (fun (param: CustomParams) ->
             param.logger.LogInformation "Hello Params"
-            $"route={param.foo}; query={param.bar}")
+            $"route=%d{param.foo}; query=%s{param.bar}")
 
         // using options from DI
         get "/settings" (fun (req: {| options: IOptions<MyCustomSettings> |}) -> req.options.Value)
@@ -67,11 +68,11 @@ let routes =
             get "/" (fun (n: int) -> n - 1)
         }
 
-        get "/even/{v}" produces<Ok<string>, BadRequest> (fun (req: {| v: int; logger: ILogger<_> |}) ->
+        get "/even/{v}" produces<Ok<string>, BadRequest> (fun (req: {| v: int; logger: ILogger<obj> |}) ->
             (if req.v % 2 = 0 then
                  !!Ok("even number!")
              else
-                 req.logger.LogInformation $"Odd number: {req.v}"
+                 req.logger.LogInformation $"Odd number: %d{req.v}"
                  !!BadRequest()))
 
         get "/delay/{n}" produces<NoContent> (fun (req: {| n: int |}) ->
@@ -89,12 +90,12 @@ let routes =
             filter (fun ctx next ->
                 task {
                     if ctx.HttpContext.Request.Headers.Authorization.ToString() = "BAD" then
-                        return UnprocessableEntity() :> obj
+                        return UnprocessableEntity() :> objnull
                     else
                         return! next ctx
                 })
 
-            get "/" produces<Ok<User[]>> (fun (req: {| db: MyDbContext |}) ->
+            get "/" produces<Ok<User array>> (fun (req: {| db: MyDbContext |}) ->
                 task {
                     let! users = req.db.Users.ToArrayAsync()
                     return Ok(users)
@@ -127,7 +128,7 @@ let routes =
                                 | None ->
                                     req.db.Users.add newUser
                                     do! req.db.saveChangesAsync ()
-                                    return !!Created($"/user/{newUser.Id.Value}", newUser)
+                                    return !!Created($"/user/%O{newUser.Id.Value}", newUser)
                         })
 
                 delete "/{userId}" produces<NoContent, NotFound> (fun (req: {| userId: Guid; db: MyDbContext |}) ->

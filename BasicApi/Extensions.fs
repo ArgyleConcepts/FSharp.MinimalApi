@@ -3,30 +3,31 @@ module BasicApi.Extensions
 
 open System
 open System.Linq
+open System.Linq.Expressions
+open System.Runtime.CompilerServices
 open System.Threading
 open System.Threading.Tasks
 open Microsoft.EntityFrameworkCore
 
-module Option =
-    let from (v: 'T) =
-        if Object.ReferenceEquals(v, null) then None else Some v
+// C#-style extensions, so the methods can require reference types that FirstOrDefaultAsync returns as null.
+[<Extension>]
+type QueryableExtensions =
 
-type IQueryable<'T> with
-
-    member this.TryFirstAsync() =
+    [<Extension>]
+    static member TryFirstAsync(query: IQueryable<'T>) =
         task {
-            let! r = this.FirstOrDefaultAsync()
-            return Option.from r
+            let! r = query.FirstOrDefaultAsync()
+            return Option.ofObj r
         }
 
-    member this.TryFirstAsync pred =
+    [<Extension>]
+    static member TryFirstAsync(query: IQueryable<'T>, predicate: Expression<Func<'T, bool>>) =
         task {
-            let! r = this.FirstOrDefaultAsync(pred, CancellationToken.None)
-            return Option.from r
+            let! r = query.FirstOrDefaultAsync(predicate, CancellationToken.None)
+            return Option.ofObj r
         }
 
-
-type DbSet<'T when 'T: not struct> with
+type DbSet<'T when 'T: not struct and 'T: not null> with
 
     member this.add v = this.Add(v) |> ignore
     member this.remove v = this.Remove(v) |> ignore

@@ -1,0 +1,8 @@
+# Wall-clock time must be supplied through TimeProvider so behavior remains deterministic.
+P:System.DateTime.Now;Use TimeProvider.GetLocalNow().
+P:System.DateTime.UtcNow;Use TimeProvider.GetUtcNow().
+
+# Production HTTP clients must come from IHttpClientFactory for managed lifetimes and centralized configuration.
+M:System.Net.Http.HttpClient.#ctor;Use IHttpClientFactory.CreateClient().
+M:System.Net.Http.HttpClient.#ctor(System.Net.Http.HttpMessageHandler);Use IHttpClientFactory.CreateClient().
+M:System.Net.Http.HttpClient.#ctor(System.Net.Http.HttpMessageHandler,System.Boolean);Use IHttpClientFactory.CreateClient().

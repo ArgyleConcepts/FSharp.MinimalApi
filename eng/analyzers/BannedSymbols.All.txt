@@ -1,0 +1,15 @@
+# Blocking waits can deadlock, starve the thread pool, and hide cancellation.
+P:System.Threading.Tasks.Task`1.Result;Await the task instead of blocking on Result.
+M:System.Threading.Tasks.Task.Wait;Await the task instead of blocking on Wait.
+M:System.Threading.Tasks.Task.Wait(System.Int32);Await the task instead of blocking on Wait.
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan);Await the task instead of blocking on Wait.
+M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken);Await the task instead of blocking on Wait.
+M:System.Threading.Tasks.Task.Wait(System.Int32,System.Threading.CancellationToken);Await the task instead of blocking on Wait.
+M:System.Runtime.CompilerServices.TaskAwaiter.GetResult;Await the task instead of blocking through GetAwaiter().GetResult().
+M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult;Await the task instead of blocking through GetAwaiter().GetResult().
+M:System.Runtime.CompilerServices.ValueTaskAwaiter.GetResult;Await the value task instead of blocking through GetAwaiter().GetResult().
+M:System.Runtime.CompilerServices.ValueTaskAwaiter`1.GetResult;Await the value task instead of blocking through GetAwaiter().GetResult().
+
+# Sleeping blocks a thread and makes timing-dependent behavior difficult to test.
+M:System.Threading.Thread.Sleep(System.Int32);Use an awaited delay or deterministic synchronization primitive.
+M:System.Threading.Thread.Sleep(System.TimeSpan);Use an awaited delay or deterministic synchronization primitive.

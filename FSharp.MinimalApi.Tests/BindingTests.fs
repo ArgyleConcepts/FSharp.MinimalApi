@@ -20,7 +20,7 @@ type Tenant =
 type OptionalTenant =
   {
     [<FromHeader(Name = "X-Tenant")>]
-    tenant: string
+    tenant: string | null
   }
 
 let private routes =
@@ -28,13 +28,13 @@ let private routes =
     get "/items/{id:int}" (fun (req: {| id: int |}) -> req.id)
     get "/search" (fun (req: {| page: int; size: Nullable<int> |}) -> req.page * req.size.GetValueOrDefault 10)
     get "/tenant" (fun (req: Tenant) -> req.tenant)
-    get "/optional-tenant" (fun (req: OptionalTenant) -> if isNull req.tenant then "none" else req.tenant)
 
-    post "/greetings" (fun (req: {| greeting: Greeting |}) ->
-      if box req.greeting |> isNull then
-        "none"
-      else
-        req.greeting.Name)
+    get "/optional-tenant" (fun (req: OptionalTenant) ->
+      match req.tenant with
+      | null -> "none"
+      | tenant -> tenant)
+
+    post "/greetings" (fun (req: {| greeting: Greeting |}) -> req.greeting.Name)
   }
 
 let private postRaw (app: TestApp) (url: string) (json: string) =
@@ -95,11 +95,12 @@ let ``a missing header of a reference type binds as null`` () =
   }
 
 [<Fact>]
-let ``a missing body binds as null`` () =
+let ``a missing body for a non-nullable parameter is a bad request`` () =
   task {
     use! app = serve routes
     let! response = send app (request HttpMethod.Post "/greetings")
-    do! expectBody ok "none" response
+    let! _ = expect HttpStatusCode.BadRequest response
+    ()
   }
 
 [<Fact>]

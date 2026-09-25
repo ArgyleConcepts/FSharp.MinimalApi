@@ -14,7 +14,7 @@ open Harness
 let private names = "abcdefghijklmnop"
 
 let private query arity =
-  [ for i in 1..arity -> $"{names[i - 1]}={i}" ] |> String.concat "&"
+  [ for i in 1..arity -> $"%c{names[i - 1]}=%d{i}" ] |> String.concat "&"
 
 let private sum arity = arity * (arity + 1) / 2
 
@@ -566,8 +566,8 @@ let arities =
 let ``lambdas bind every argument`` (verb: string, arity: int) =
   task {
     use! app = start (fun app -> verbs[verb] app)
-    let! response = send app (request (HttpMethod verb) $"/{arity}?{query arity}")
-    do! expectBody ok $"{sum arity}" response
+    let! response = send app (request (HttpMethod verb) $"/%d{arity}?%s{query arity}")
+    do! expectBody ok $"%d{sum arity}" response
   }
 
 [<Fact>]
@@ -592,7 +592,7 @@ let ``lambdas return what the builder returns`` () =
       start (fun app -> app.MapGet("/named", (fun (id: int) -> id * 2)).WithName("double") |> ignore)
 
     let e = endpoint app "GET" "/named"
-    Assert.Equal("double", e.Metadata.GetMetadata<IEndpointNameMetadata>().EndpointName)
+    Assert.Equal("double", (nonNull (e.Metadata.GetMetadata<IEndpointNameMetadata>())).EndpointName)
     let! response = get app "/named?id=21"
     do! expectBody ok "42" response
   }
@@ -606,4 +606,4 @@ let ``Delegate.fromFuncWithMaybeUnit keeps other functions as they are`` () =
 let ``Delegate.fromFuncWithMaybeUnit drops a unit argument`` () =
   let handler = Delegate.fromFuncWithMaybeUnit (Func<unit, string>(fun () -> "unit"))
   Assert.Empty(handler.Method.GetParameters())
-  Assert.Equal("unit", handler.DynamicInvoke() :?> string)
+  Assert.Equal("unit", handler.DynamicInvoke() :?> (string | null))

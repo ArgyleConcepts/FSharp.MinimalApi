@@ -5,7 +5,6 @@
         <OutputType>Library</OutputType>
         <IsPackable>false</IsPackable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <RootNamespace>FSharp.MinimalApi</RootNamespace>
 
         <Authors>Lucas Teles, Argyle Concepts</Authors>

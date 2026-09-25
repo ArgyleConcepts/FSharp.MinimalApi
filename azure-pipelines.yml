@@ -36,6 +36,18 @@ steps:
   - script: dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
     displayName: Build solution
 
+  - script: dotnet fsi eng/fsharp-analysis/Run.fsx
+    displayName: Analyze F#
+    env:
+      FSHARP_ANALYSIS_OUTPUT_DIRECTORY: $(Build.ArtifactStagingDirectory)/fsharp-analysis
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish F# analysis results
+    condition: succeededOrFailed()
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)/fsharp-analysis
+      artifact: fsharp-analysis
+
   - script: dotnet test --solution FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
     displayName: Run tests
 

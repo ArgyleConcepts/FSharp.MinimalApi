@@ -23,6 +23,7 @@ type Calls() =
 
 type Greeting = { Name: string; Punctuation: string }
 
+[<NoComparison>]
 type Bound =
   {
     [<FromRoute>]
@@ -95,8 +96,8 @@ let ``record binds route, query, header, body and services`` () =
       withCalls (
         endpoints {
           put "/greet/{id}" (fun (req: Bound) ->
-            req.calls.Add $"{req.id}"
-            $"{req.tenant}:{req.search}:{req.greeting.Name}{req.greeting.Punctuation}")
+            req.calls.Add $"%d{req.id}"
+            $"%s{req.tenant}:%s{req.search}:%s{req.greeting.Name}%s{req.greeting.Punctuation}")
         }
       )
 
@@ -119,7 +120,7 @@ let ``handler returning a record serializes it as JSON`` () =
     let! response = get app "/greeting/Bob"
     let! body = expect ok response
     Assert.Equal("""{"name":"Bob","punctuation":"?"}""", body)
-    Assert.Equal("application/json", response.Content.Headers.ContentType.MediaType)
+    Assert.Equal("application/json", (nonNull response.Content.Headers.ContentType).MediaType)
   }
 
 [<Fact>]
@@ -133,7 +134,7 @@ let ``Task handlers with and without parameters`` () =
           get "/task" (fun () -> Task.FromResult "no params")
           get "/task/{v}" (fun (req: {| v: int |}) -> task { return req.v * 2 })
           post "/task" (fun () -> task { calls.Add "no params" })
-          post "/task/{v}" (fun (req: {| v: int |}) -> task { calls.Add $"{req.v}" })
+          post "/task/{v}" (fun (req: {| v: int |}) -> task { calls.Add $"%d{req.v}" })
         }
       )
 
@@ -159,7 +160,7 @@ let ``Async handlers with and without parameters`` () =
           get "/async" (fun () -> async { return "no params" })
           get "/async/{v}" (fun (req: {| v: int |}) -> async { return req.v * 2 })
           put "/async" (fun () -> async { calls.Add "no params" })
-          put "/async/{v}" (fun (req: {| v: int |}) -> async { calls.Add $"{req.v}" })
+          put "/async/{v}" (fun (req: {| v: int |}) -> async { calls.Add $"%d{req.v}" })
         }
       )
 
@@ -292,7 +293,7 @@ let ``the route handler builder can be configured per endpoint`` () =
       )
 
     let nameOf verb route =
-      (endpoint app verb route).Metadata.GetMetadata<IEndpointNameMetadata>().EndpointName
+      (nonNull ((endpoint app verb route).Metadata.GetMetadata<IEndpointNameMetadata>())).EndpointName
 
     Assert.Equal("get-it", nameOf "GET" "/configured")
     Assert.Equal("post-it", nameOf "POST" "/configured")
@@ -317,7 +318,7 @@ let ``non-generic Task handlers`` () =
             Task.CompletedTask)
 
           post "/plain/{v}" (fun (req: {| v: int |}) ->
-            calls.Add $"{req.v}"
+            calls.Add $"%d{req.v}"
             Task.CompletedTask)
         }
       )

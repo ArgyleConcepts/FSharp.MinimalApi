@@ -64,7 +64,8 @@ let statusOf case = fst declared[case - 1]
 
 type Case = {| case: int |}
 
-let private unexpected (req: Case) : 'a = failwith $"unexpected case {req.case}"
+let private unexpected (req: Case) : 'a =
+  failwith $"unexpected case %d{req.case}"
 
 type Arity11 = Results<R1, R2, R3, R4, R5, Results<R6, R7, R8, R9, R10, R11>>
 
@@ -199,7 +200,7 @@ let arities = TheoryData<int>([ 1..11 ])
 let ``produces declares every result type`` (arity: int) =
   task {
     use! app = serve routes
-    let e = endpoint app "GET" $"/arity/{arity}"
+    let e = endpoint app "GET" $"/arity/%d{arity}"
     Assert.Equal<(int * Type) list>(expectedFor arity, producedBy e)
   }
 
@@ -210,7 +211,7 @@ let ``produces handlers can return every declared result`` (arity: int) =
     use! app = serve routes
 
     for case in 1..arity do
-      let! response = get app $"/arity/{arity}?case={case}"
+      let! response = get app $"/arity/%d{arity}?case=%d{case}"
       let! _ = expect (enum<HttpStatusCode>(statusOf case)) response
       ()
   }
@@ -219,7 +220,7 @@ type Id = {| id: int |}
 
 let private found (req: Id) : Results<Ok<string>, NotFound> =
   if req.id > 0 then
-    !!(Ok $"found {req.id}")
+    !!(Ok $"found %d{req.id}")
   else
     !!NotFound()
 
@@ -256,12 +257,12 @@ let verbsAndShapes =
 let ``produces works for every verb and handler shape`` (verb: string, shape: string) =
   task {
     use! app = serve shapes
-    let e = endpoint app verb $"/{shape}/{{id}}"
+    let e = endpoint app verb $"/%s{shape}/{{id}}"
     Assert.Equal<(int * Type) list>([ 200, typeof<string>; 404, typeof<Void> ], producedBy e)
 
-    let! found = send app (request (HttpMethod verb) $"/{shape}/5")
+    let! found = send app (request (HttpMethod verb) $"/%s{shape}/5")
     do! expectBody HttpStatusCode.OK "\"found 5\"" found
-    let! missing = send app (request (HttpMethod verb) $"/{shape}/0")
+    let! missing = send app (request (HttpMethod verb) $"/%s{shape}/0")
     do! expectBody HttpStatusCode.NotFound "" missing
   }
 
@@ -278,9 +279,9 @@ let ``produces works with parameterless handlers`` () =
       )
 
     for shape in [ "sync"; "task"; "async" ] do
-      Assert.Equal<(int * Type) list>([ 200, typeof<string> ], producedBy (endpoint app "GET" $"/{shape}"))
-      let! response = get app $"/{shape}"
-      do! expectBody HttpStatusCode.OK $"\"{shape}\"" response
+      Assert.Equal<(int * Type) list>([ 200, typeof<string> ], producedBy (endpoint app "GET" $"/%s{shape}"))
+      let! response = get app $"/%s{shape}"
+      do! expectBody HttpStatusCode.OK $"\"%s{shape}\"" response
   }
 
 [<Fact>]
