@@ -311,18 +311,26 @@ let ``handlers without produces declare only what the result type provides`` () 
 let private namedResult (req: Id) : Task<Results<Ok<string>, NotFound>> =
   task {
     if req.id > 0 then
-      return Results2.first (Ok $"found {req.id}")
+      return Results2.first (Ok(sprintf "found %d" req.id))
     else
       return Results2.second (NotFound())
   }
 
 let private namedSync (req: Id) : Results<Ok<string>, NotFound> =
   if req.id > 0 then
-    Results2.first (Ok $"found {req.id}")
+    Results2.first (Ok(sprintf "found %d" req.id))
   else
     Results2.second (NotFound())
 
 let private namedAsync (req: Id) : Async<Results<Ok<string>, NotFound>> = async { return namedSync req }
+
+let private requiredValue value =
+  match value with
+  | Some value -> value
+  | None -> failwith "Expected a value"
+
+let private requiredProperty (node: JsonNode) (key: string) =
+  node[key] |> Option.ofObj |> requiredValue
 
 [<Fact>]
 let ``named handlers need no phantom result and retain response metadata`` () =
@@ -341,28 +349,31 @@ let ``named handlers need no phantom result and retain response metadata`` () =
         routes.Apply app |> ignore)
 
     for shape in [ "named"; "sync"; "async" ] do
-      let route = $"/{shape}/{{id}}"
+      let route = sprintf "/%s/{id}" shape
       Assert.Equal<(int * Type) list>([ 200, typeof<string>; 404, typeof<Void> ], producedBy (endpoint app "GET" route))
-      let! found = get app $"/{shape}/5"
+      let! found = get app (sprintf "/%s/5" shape)
       do! expectBody HttpStatusCode.OK "\"found 5\"" found
-      let! missing = get app $"/{shape}/0"
+      let! missing = get app (sprintf "/%s/0" shape)
       do! expectBody HttpStatusCode.NotFound "" missing
 
       let! document =
         app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
 
-      let json = JsonNode.Parse(document)
-      let responses = json["paths"].[$"/{shape}/{{id}}"].["get"].["responses"]
+      let json = JsonNode.Parse(document) |> Option.ofObj |> requiredValue
+
+      let responses =
+        [ "paths"; route; "get"; "responses" ] |> List.fold requiredProperty json
+
       Assert.NotNull(responses["200"])
       Assert.NotNull(responses["404"])
   }
 
-type RawJsonResult(bytes: byte[]) =
+type RawJsonResult(bytes: byte array) =
   interface IResult with
     member _.ExecuteAsync(context) =
       task {
         context.Response.ContentType <- "application/json"
-        do! context.Response.Body.WriteAsync(bytes, 0, bytes.Length)
+        do! context.Response.Body.WriteAsync(ReadOnlyMemory<byte>(bytes), context.RequestAborted)
       }
       :> Task
 
@@ -377,7 +388,9 @@ let ``custom IResult writes exact pre-serialized bytes`` () =
   task {
     use! app =
       serve (
-        endpoints { get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, "application/json")) }
+        endpoints {
+          get "/raw/{id}" rawJson (fun (b: RouteHandlerBuilder) -> b.Produces(200, typeof<obj>, "application/json"))
+        }
       )
 
     Assert.Equal<(int * Type) list>(
@@ -392,7 +405,7 @@ let ``custom IResult writes exact pre-serialized bytes`` () =
 
     Assert.Equal(HttpStatusCode.OK, response.StatusCode)
     Assert.Equal<byte>(Encoding.UTF8.GetBytes("{\"id\":1}"), actual)
-    Assert.Equal("application/json", response.Content.Headers.ContentType.MediaType)
+    Assert.Equal("application/json", (response.Content.Headers.ContentType |> Option.ofObj |> requiredValue).MediaType)
     let! missing = get app "/raw/0"
     do! expectBody HttpStatusCode.NotFound "" missing
   }
