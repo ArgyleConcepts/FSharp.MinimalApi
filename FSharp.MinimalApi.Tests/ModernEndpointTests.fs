@@ -22,8 +22,23 @@ open type TypedResults
 
 let private item (req: {| id: int |}) = Ok req.id
 
-let private requiredMetadata<'T when 'T: not struct and 'T: not null> (mapped: Endpoint) =
-  mapped.Metadata.GetMetadata<'T>() |> Option.ofObj |> Option.get
+let private requiredName (mapped: Endpoint) =
+  mapped.Metadata.GetMetadata<IEndpointNameMetadata>()
+  |> Option.ofObj
+  |> Option.get
+
+let private requiredSummary (mapped: Endpoint) =
+  mapped.Metadata.GetMetadata<IEndpointSummaryMetadata>()
+  |> Option.ofObj
+  |> Option.get
+
+let private requiredMethods (mapped: Endpoint) =
+  mapped.Metadata.GetMetadata<IHttpMethodMetadata>() |> Option.ofObj |> Option.get
+
+let private requiredRateLimit (mapped: Endpoint) =
+  mapped.Metadata.GetMetadata<EnableRateLimitingAttribute>()
+  |> Option.ofObj
+  |> Option.get
 
 let private requiredProperty (node: JsonNode) (name: string) =
   node[name] |> Option.ofObj |> Option.get
@@ -50,18 +65,15 @@ let ``PATCH and methods map F# handlers inside groups`` () =
         routes.Apply app |> ignore)
 
     let patched = endpoint app "PATCH" "/api/items/{id}"
-    Assert.Equal("patch-item", (requiredMetadata<IEndpointNameMetadata> patched).EndpointName)
-    Assert.Equal("Patch an item", (requiredMetadata<IEndpointSummaryMetadata> patched).Summary)
+    Assert.Equal("patch-item", (requiredName patched).EndpointName)
+    Assert.Equal("Patch an item", (requiredSummary patched).Summary)
     Assert.Equal<(int * Type) list>([ 200, typeof<int> ], producedBy patched)
     let! response = send app (request HttpMethod.Patch "/api/items/42")
     do! expectBody ok "42" response
 
     let mapped = endpoint app "HEAD" "/api/inspect/{id}"
 
-    Assert.Equal<string list>(
-      [ "HEAD"; "OPTIONS" ],
-      (requiredMetadata<IHttpMethodMetadata> mapped).HttpMethods |> List.ofSeq
-    )
+    Assert.Equal<string list>([ "HEAD"; "OPTIONS" ], (requiredMethods mapped).HttpMethods |> List.ofSeq)
 
     for verb in [ HttpMethod.Head; HttpMethod.Options ] do
       let! result = send app (request verb "/api/inspect/7")
@@ -129,7 +141,7 @@ let ``PATCH and methods accept .NET delegates`` () =
     let! patched = send app (request HttpMethod.Patch "/delegate")
     do! expectBody ok "patched" patched
     let mapped = endpoint app "HEAD" "/delegate"
-    Assert.Equal<string list>([ "HEAD" ], (requiredMetadata<IHttpMethodMetadata> mapped).HttpMethods |> List.ofSeq)
+    Assert.Equal<string list>([ "HEAD" ], (requiredMethods mapped).HttpMethods |> List.ofSeq)
     let! headed = send app (request HttpMethod.Head "/delegate")
     do! expectBody HttpStatusCode.NoContent "" headed
   }
@@ -155,15 +167,15 @@ let ``group policies and per-endpoint configuration retain framework metadata`` 
       )
 
     let mapped = endpoint app "GET" "/api/item"
-    Assert.Equal("get-item", (requiredMetadata<IEndpointNameMetadata> mapped).EndpointName)
-    Assert.Equal("Get one item", (requiredMetadata<IEndpointSummaryMetadata> mapped).Summary)
+    Assert.Equal("get-item", (requiredName mapped).EndpointName)
+    Assert.Equal("Get one item", (requiredSummary mapped).Summary)
     Assert.Contains(mapped.Metadata.GetOrderedMetadata<IAuthorizeData>(), fun auth -> auth.Policy = "members")
-    Assert.Equal("one", (requiredMetadata<EnableRateLimitingAttribute> mapped).PolicyName)
+    Assert.Equal("one", (requiredRateLimit mapped).PolicyName)
     Assert.NotNull(mapped.Metadata.GetMetadata<IOutputCachePolicy>())
     let other = endpoint app "GET" "/api/other"
-    Assert.Equal("Group summary", (requiredMetadata<IEndpointSummaryMetadata> other).Summary)
+    Assert.Equal("Group summary", (requiredSummary other).Summary)
     Assert.Contains(other.Metadata.GetOrderedMetadata<IAuthorizeData>(), fun auth -> auth.Policy = "members")
-    Assert.Equal("one", (requiredMetadata<EnableRateLimitingAttribute> other).PolicyName)
+    Assert.Equal("one", (requiredRateLimit other).PolicyName)
     Assert.NotNull(other.Metadata.GetMetadata<IOutputCachePolicy>())
   }
 
@@ -176,7 +188,7 @@ let ``group filter runs for PATCH without changing other routes`` () =
           route "filtered" {
             filter (fun ctx next ->
               if ctx.HttpContext.Request.Headers.ContainsKey("X-Block") then
-                ValueTask<obj>(BadRequest() :> obj)
+                ValueTask<obj>(Results.BadRequest())
               else
                 next ctx)
 
