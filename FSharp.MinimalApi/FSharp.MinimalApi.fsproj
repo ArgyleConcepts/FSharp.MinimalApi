@@ -3,13 +3,15 @@
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Library</OutputType>
         <IsPackable>true</IsPackable>
+        <PackageId>ArgyleConcepts.FSharp.MinimalApi</PackageId>
+        <PackageVersion>$(ArgylePackageVersion)</PackageVersion>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <Authors>Lucas Teles - lucas.teles@outlook.com</Authors>
-        <Company/>
+        <Authors>Lucas Teles, Argyle Concepts</Authors>
+        <Company>Argyle Concepts</Company>
         <Description>Easily use AspNet Core MinimalApi with F#</Description>
-        <RepositoryType>GitHub</RepositoryType>
-        <PackageProjectUrl>https://github.com/lucasteles/FSharp.MinimalApi</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/lucasteles/FSharp.MinimalApi</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/ArgyleConcepts/FSharp.MinimalApi</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/ArgyleConcepts/FSharp.MinimalApi</RepositoryUrl>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
         <IncludeSymbols>true</IncludeSymbols>
@@ -20,21 +22,15 @@
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
         <PackageReadmeFile>README.md</PackageReadmeFile>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeInteropAssembly</TargetsForTfmSpecificBuildOutput>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
         <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Update="FSharp.Core" Version="7.0"/>
-    </ItemGroup>
-
-    <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\"/>
+        <None Include="..\LICENSE" Pack="true" PackagePath="\"/>
         <Compile Include="Constants.fs"/>
         <Compile Include="Extensions\Utils.fs"/>
         <Compile Include="Extensions\DI.fs"/>
@@ -46,7 +42,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\FSharp.MinimalApi.Interop\FSharp.MinimalApi.Interop.csproj" />
+        <ProjectReference Include="..\FSharp.MinimalApi.Interop\FSharp.MinimalApi.Interop.csproj" PrivateAssets="all" />
     </ItemGroup>
+
+    <Target Name="IncludeInteropAssembly">
+        <ItemGroup>
+            <BuildOutputInPackage Include="$(OutputPath)FSharp.MinimalApi.Interop.dll" />
+            <BuildOutputInPackage Include="$(OutputPath)FSharp.MinimalApi.Interop.pdb" Condition="Exists('$(OutputPath)FSharp.MinimalApi.Interop.pdb')" />
+        </ItemGroup>
+    </Target>
 
 </Project>

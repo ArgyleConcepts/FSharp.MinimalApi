@@ -1,19 +1,16 @@
-[![CI](https://github.com/lucasteles/FSharp.MinimalApi/actions/workflows/ci.yml/badge.svg)](https://github.com/lucasteles/FSharp.MinimalApi/actions/workflows/ci.yml)
-[![Nuget](https://img.shields.io/nuget/v/FSharp.MinimalApi.svg?style=flat)](https://www.nuget.org/packages/FSharp.MinimalApi)
+# FSharp.MinimalApi
 
-# FSharp.MinimalApi 
+This is the Argyle Concepts maintained .NET 10 fork of [FSharp.MinimalApi](https://github.com/lucasteles/FSharp.MinimalApi), originally created by Lucas Teles. The original MIT copyright and permission notice are retained in [LICENSE](LICENSE). This fork's source, issues, and pull requests live in [ArgyleConcepts/FSharp.MinimalApi](https://github.com/ArgyleConcepts/FSharp.MinimalApi).
+
+The Argyle packages are being prepared locally and have **not been published**.
 
 Easily define your routes in your [ASP.NET Core MinimalAPI](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis) with [`TypedResults`](https://learn.microsoft.com/en-us/aspnet/core/release-notes/aspnetcore-7.0?view=aspnetcore-7.0#typed-results-for-minimal-apis) support
 
 ## Getting started
 
-[NuGet package](https://www.nuget.org/packages/FSharp.MinimalApi) available:
+The planned packages are `ArgyleConcepts.FSharp.MinimalApi` and the optional `ArgyleConcepts.FSharp.MinimalApi.OpenApi`, both version `0.3.0`. The Core package includes the Interop assembly, so there is no separate Interop package. Until a release is approved, use project references or the locally packed packages from [Package build and release readiness](#package-build-and-release-readiness).
 
-```ps
-$ dotnet add package FSharp.MinimalApi
-```
-
-> **💡** You can check a complete sample [HERE](https://github.com/lucasteles/FSharp.MinimalApi/tree/master/BasicApi)
+See the complete [BasicApi sample](BasicApi/Program.fs).
 
 
 ## Defining Routes
@@ -129,7 +126,7 @@ let main args =
 
 ## Pull request validation
 
-[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through [FSharp.MinimalApi PR Validation](https://dev.azure.com/ArgyleConceptsLLC/Argyle%20Converge/_build?definitionId=33) in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, and checks F# formatting with Fantomas.
+[`azure-pipelines.yml`](azure-pipelines.yml) validates GitHub pull requests into `develop` through [FSharp.MinimalApi PR Validation](https://dev.azure.com/ArgyleConceptsLLC/Argyle%20Converge/_build?definitionId=33) in the **Argyle Converge** project of the **ArgyleConceptsLLC** Azure DevOps organization. It does not run on pushes or publish packages. The pipeline installs the SDK selected by `global.json`, restores the solution and local tools, builds in Release, runs the solution tests, checks F# formatting with Fantomas, and verifies locally packed packages.
 
 To reproduce the validation locally, run these commands from the repository root:
 
@@ -139,6 +136,7 @@ dotnet tool restore
 dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
 dotnet test --solution FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
 dotnet fantomas check .
+bash eng/verify-packages.sh
 ```
 
 Maintainer setup:
@@ -147,15 +145,26 @@ Maintainer setup:
 2. Open a PR targeting `develop` and confirm Azure Pipelines starts automatically and posts a successful check. Changes to that PR should start another run.
 3. In the GitHub repository settings, protect `develop` and require the **FSharp.MinimalApi PR Validation** check from Azure Pipelines. Require the branch to be up to date before merging. A failed formatting or test run must block the PR.
 
-Package build and publication metadata are being finalized in FSMAPI-4. Package publishing remains a separate release decision.
+Package publishing remains a separate release decision.
+
+## Package build and release readiness
+
+`Directory.Build.props` sets the shared `0.3.0` package version and the `FSharp.Core` 10.0.100 minimum used by every project. The Core package contains both `FSharp.MinimalApi.dll` and its implementation-only `FSharp.MinimalApi.Interop.dll`; the OpenAPI package is separate. Both include the README and the original MIT LICENSE. The package project and repository URLs point to this fork, while the README credits Lucas Teles and links to the upstream project.
+
+Run `bash eng/verify-packages.sh` to pack both packages into a temporary local directory, inspect their metadata and contents, then restore and run a small F# app against those packages. The temporary files are deleted when the check finishes. To retain packages for inspection, run:
+
+```sh
+dotnet pack FSharp.MinimalApi/FSharp.MinimalApi.fsproj --configuration Release --output artifacts/packages
+dotnet pack FSharp.MinimalApi.OpenApi/FSharp.MinimalApi.OpenApi.fsproj --configuration Release --output artifacts/packages
+```
+
+The intended NuGet owner is an Argyle Concepts organization account. The Argyle packages have not been published. Before any release, review the two `.nupkg` and `.snupkg` files, confirm the version and source links, rerun the validation commands above, set up organization ownership and publishing credentials outside this repository, and make a separate release decision. The PR pipeline has no publishing step or credentials.
 
 ## OpenAPI
 
 `FSharp.MinimalApi.OpenApi` makes [Microsoft.AspNetCore.OpenApi](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/overview) describe F# types the way [FSharp.SystemTextJson](https://github.com/Tarmil/FSharp.SystemTextJson) serializes them. Without it, records, unions, options and F# collections appear as empty schemas, because FSharp.SystemTextJson's converters hide their structure from the generator.
 
-```ps
-$ dotnet add package FSharp.MinimalApi.OpenApi
-```
+Its planned package ID is `ArgyleConcepts.FSharp.MinimalApi.OpenApi`.
 
 Pass the same `JsonFSharpOptions` you use for serialization:
 

@@ -41,3 +41,6 @@ steps:
 
   - script: dotnet fantomas check .
     displayName: Check F# formatting
+
+  - script: bash eng/verify-packages.sh
+    displayName: Pack and consume local NuGet packages

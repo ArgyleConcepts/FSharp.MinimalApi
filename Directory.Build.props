@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <ArgylePackageVersion>0.3.0</ArgylePackageVersion>
+    <ArgyleFSharpCoreVersion>10.0.100</ArgyleFSharpCoreVersion>
+    <FSharpCoreImplicitPackageVersion>$(ArgyleFSharpCoreVersion)</FSharpCoreImplicitPackageVersion>
+    <ContinuousIntegrationBuild Condition="'$(TF_BUILD)' == 'True'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>
