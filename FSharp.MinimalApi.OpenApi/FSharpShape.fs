@@ -144,6 +144,14 @@ module internal Naming =
             && name.Length > 4
             && Seq.forall Char.IsDigit (name.Substring 4))
 
+    let private fieldJsonName (case: UnionCaseInfo) (field: PropertyInfo) =
+        let fromCase =
+            case.GetCustomAttributes(typeof<JsonNameAttribute>)
+            |> Seq.cast<JsonNameAttribute>
+            |> Seq.tryFind (fun a -> a.Field = field.Name)
+
+        jsonNames field |> Seq.tryHead |> Option.orElse fromCase
+
     /// Union field name: [<JsonName>] on the field or case, then field names from types, then the naming policy.
     let unionField
         (options: JsonFSharpOptions)
@@ -151,20 +159,26 @@ module internal Naming =
         (case: UnionCaseInfo)
         (field: PropertyInfo)
         =
-        let fromCase =
-            case.GetCustomAttributes(typeof<JsonNameAttribute>)
-            |> Seq.cast<JsonNameAttribute>
-            |> Seq.tryFind (fun a -> a.Field = field.Name)
+        let namedFromType (field: PropertyInfo) =
+            options.UnionEncoding.HasFlag JsonUnionEncoding.UnionFieldNamesFromTypes
+            && isGeneratedFieldName field.Name
+            && (fieldJsonName case field).IsNone
 
-        match jsonNames field |> Seq.tryHead |> Option.orElse fromCase with
+        match fieldJsonName case field with
         | Some attribute -> jsonNameText attribute.Name
         | None ->
             let name =
-                if
-                    options.UnionEncoding.HasFlag JsonUnionEncoding.UnionFieldNamesFromTypes
-                    && isGeneratedFieldName field.Name
-                then
-                    field.PropertyType.Name
+                if namedFromType field then
+                    // Fields named after the same type are numbered from 1, like FSharp.SystemTextJson does.
+                    let sameType =
+                        case.GetFields()
+                        |> Array.filter (fun f -> namedFromType f && f.PropertyType.Name = field.PropertyType.Name)
+
+                    if sameType.Length > 1 then
+                        let index = sameType |> Array.findIndex (fun f -> f.Name = field.Name)
+                        $"{field.PropertyType.Name}{index + 1}"
+                    else
+                        field.PropertyType.Name
                 else
                     field.Name
 

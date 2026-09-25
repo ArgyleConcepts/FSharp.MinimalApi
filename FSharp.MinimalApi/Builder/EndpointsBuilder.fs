@@ -1,7 +1,6 @@
 ﻿namespace FSharp.MinimalApi.Builder
 
 open System
-open System.Diagnostics
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Authorization
 open Microsoft.AspNetCore.Builder
@@ -11,13 +10,14 @@ open FSharp.MinimalApi
 
 type EndpointsMap =
     internal
-        { Order: int64
-          MapFn: RouteGroupBuilder -> RouteGroupBuilder
+        { MapFn: RouteGroupBuilder -> RouteGroupBuilder
           GroupName: string option }
 
     member this.Apply(r: IEndpointRouteBuilder) =
         this.GroupName |> Option.defaultValue String.Empty |> r.MapGroup |> this.MapFn
 
+/// Every value passing through the builder is the state of the group being built.
+/// Nested endpoints are mapped as subgroups of it, in the order they are declared.
 type EndpointsBuilder(?groupName: string) =
     inherit RouterBaseBuilder<EndpointsMap>()
 
@@ -28,10 +28,7 @@ type EndpointsBuilder(?groupName: string) =
         { state with
             MapFn = state.MapFn >> tap f }
 
-    member _.Zero() =
-        { Order = 0
-          MapFn = id
-          GroupName = groupName }
+    member _.Zero() = { MapFn = id; GroupName = groupName }
 
     member _.Run(route: EndpointsMap) = route
     member _.Run(()) = ()
@@ -39,29 +36,14 @@ type EndpointsBuilder(?groupName: string) =
     member this.Yield(()) = this.Zero()
 
     member this.Yield(route: EndpointsMap) =
-        { route with
-            Order = Stopwatch.GetTimestamp() }
+        { this.Zero() with
+            MapFn = tap route.Apply }
 
     member _.Delay(f) = f ()
 
     member this.Combine(endpoints1: EndpointsMap, endpoints2: EndpointsMap) =
-        let maps = [ endpoints1; endpoints2 ] |> List.sortBy (fun e -> e.Order)
-
-        match maps[0], maps[1] with
-        | { GroupName = None }, { GroupName = Some _ }
-        | { GroupName = Some _ }, { GroupName = None } as (m1, m2) ->
-            { m1 with
-                MapFn = m1.MapFn >> tap m2.Apply }
-
-        | { GroupName = None }, { GroupName = None }
-        | { GroupName = Some _ }, { GroupName = Some _ } as (m1, m2) ->
-            if m1.Order = 0 then
-                { m1 with
-                    MapFn = m1.MapFn >> (tap m2.Apply) }
-            else
-                { MapFn = (tap m1.Apply) >> (tap m2.Apply)
-                  Order = 1
-                  GroupName = None }
+        { endpoints1 with
+            MapFn = endpoints1.MapFn >> endpoints2.MapFn }
 
     member this.For(state: EndpointsMap, f: unit -> EndpointsMap) = this.Combine(state, f ())
 

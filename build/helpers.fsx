@@ -1,12 +1,13 @@
 #r "nuget: Fake.DotNet.Cli"
 #r "nuget: Fake.IO.FileSystem"
 #r "nuget: Fake.Core.CommandLineParsing"
-#r "nuget: Fake.DotNet.Testing.Coverlet"
 #r "nuget: Fake.Testing.ReportGenerator"
 #r "nuget: Fake.Core.Target"
 #r "nuget: CommandLineParser.FSharp, 2.9.1"
 
 open System
+open System.Globalization
+open System.Xml.Linq
 open Fake.Core
 open Fake.DotNet
 open Fake.IO
@@ -87,29 +88,62 @@ let printFiles onde files =
 
     files
 
+/// Minimum line coverage for each library assembly; the test target fails below it.
+let coverageThreshold = 0.9
+
+let coveredAssemblies =
+    [ "FSharp.MinimalApi"
+      "FSharp.MinimalApi.Interop"
+      "FSharp.MinimalApi.OpenApi" ]
+
+let coverageFile (proj: string) =
+    testReportFolder / $"{IO.Path.GetFileNameWithoutExtension proj}.cobertura.xml"
+
+// Runs a Debug build: in Release the F# optimizer inlines small library members into the tests,
+// so their own bodies never run and coverage is under-reported.
 let dotnetTest proj =
     printProj proj
 
-    DotNet.test
-        (fun c ->
-            { c with
-                NoBuild = true
-                NoRestore = true
-                Configuration = DotNet.BuildConfiguration.Release })
-        proj
+    let result =
+        DotNet.exec
+            id
+            "test"
+            $"--project \"{proj}\" --configuration Debug -- --coverage --coverage-output-format cobertura --coverage-output \"{coverageFile proj}\""
 
-let coverletTest proj =
-    printProj proj
+    if not result.OK then
+        failwith $"Tests failed in {proj}"
 
-    DotNet.test
-        (fun p ->
-            { p with
-                NoBuild = true
-                NoRestore = true
-                Configuration = DotNet.BuildConfiguration.Release
-                Logger = Some "trx;logfilename=result.xml"
-                Settings = Some $"{solutionDir}/coverlet.runsettings" })
-        proj
+let lineRates (file: string) =
+    XDocument.Load(file).Descendants("package")
+    |> Seq.map (fun p ->
+        p.Attribute("name").Value, Double.Parse(p.Attribute("line-rate").Value, CultureInfo.InvariantCulture))
+
+let checkCoverage (projects: string seq) =
+    let rates =
+        projects
+        |> Seq.map coverageFile
+        |> Seq.collect lineRates
+        |> Seq.groupBy fst
+        |> Seq.map (fun (name, rates) -> name, rates |> Seq.map snd |> Seq.max)
+        |> Map.ofSeq
+
+    for name in coveredAssemblies do
+        match rates.TryFind name with
+        | Some rate -> Trace.logfn "%s line coverage: %.1f%%" name (rate * 100.)
+        | None -> ()
+
+    let failures =
+        coveredAssemblies
+        |> List.choose (fun name ->
+            match rates.TryFind name with
+            | Some rate when rate >= coverageThreshold -> None
+            | Some rate -> Some $"{name} has {rate * 100.:F1}%% line coverage"
+            | None -> Some $"{name} has no coverage data")
+
+    if not failures.IsEmpty then
+        failures
+        |> String.concat Environment.NewLine
+        |> failwithf "Coverage is below %.0f%%:%s%s" (coverageThreshold * 100.) Environment.NewLine
 
 let generateCoverageReport () =
     Trace.logfn "%s" testReportFolder
@@ -121,12 +155,8 @@ let generateCoverageReport () =
                 TargetDir = testReportFolder
                 LogVerbosity = ReportGenerator.LogVerbosity.Error
                 ToolType = ToolType.CreateLocalTool()
-                ReportTypes =
-                    [ ReportGenerator.ReportType.Html
-                      ReportGenerator.ReportType.Cobertura
-                      ReportGenerator.ReportType.JsonSummary
-                      ReportGenerator.ReportType.Clover ] })
-        [ $"{solutionDir}/tests/**/coverage.cobertura.xml" ]
+                ReportTypes = [ ReportGenerator.ReportType.Html; ReportGenerator.ReportType.JsonSummary ] })
+        [ $"{testReportFolder}/*.cobertura.xml" ]
 
 
 let fantomasCheck () =

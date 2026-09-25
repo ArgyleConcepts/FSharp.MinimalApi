@@ -4,15 +4,15 @@ open System
 open System.Text.Json
 open System.Text.Json.Nodes
 open System.Text.Json.Serialization
-open Expecto
 open Json.Schema
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http.Json
-open Microsoft.AspNetCore.TestHost
+open Microsoft.AspNetCore.OpenApi
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Options
+open Xunit
 open FSharp.MinimalApi.OpenApi
+open Harness
 
 type Fieldless =
   | A
@@ -45,6 +45,19 @@ type Renamed =
   | [<JsonName "first">] First
   | [<JsonName("val", Field = "value")>] Second of value: int
 
+type Coded =
+  | [<JsonName 1>] One
+  | [<JsonName true>] Yes
+
+type Wrap = Wrap of Payload
+
+type Point =
+  | Point of int * string * int
+  | Labeled of x: int * int
+  | Origin
+
+type UserId = UserId of int
+
 type Sample =
   {
     Name: string
@@ -73,6 +86,11 @@ type Sample =
     Maybe: Skippable<int>
     Outcome: Result<int, string>
     Anonymous: {| Inner: int option |}
+    Coded: Coded
+    Owner: Payload option
+    Wrapped: Wrap
+    Point: Point
+    Unique: Set<int> option
   }
 
 let samples =
@@ -101,6 +119,11 @@ let samples =
       Maybe = Include 5
       Outcome = Ok 1
       Anonymous = {| Inner = Some 1 |}
+      Coded = One
+      Owner = Some { Id = 2; Label = "owner" }
+      Wrapped = Wrap { Id = 3; Label = "wrapped" }
+      Point = Point(1, "a", 2)
+      Unique = Some(set [ 1 ])
     }
 
   [
@@ -118,31 +141,40 @@ let samples =
         Maybe = Skip
         Outcome = Error "e"
         Anonymous = {| Inner = None |}
+        Coded = Yes
+        Owner = None
+        Point = Origin
+        Unique = None
     }
-    { first with Value = Nothing }
+    { first with
+        Value = Nothing
+        Point = Labeled(1, 2)
+    }
   ]
 
 let encodings =
-  [
-    "Default", JsonFSharpOptions.Default()
-    "NewtonsoftLike", JsonFSharpOptions.NewtonsoftLike()
-    "ThothLike", JsonFSharpOptions.ThothLike()
-    "FSharpLuLike", JsonFSharpOptions.FSharpLuLike()
-    "AdjacentTag named fields", JsonFSharpOptions.Default().WithUnionNamedFields()
-    "ExternalTag", JsonFSharpOptions.Default().WithUnionExternalTag()
-    "ExternalTag named fields", JsonFSharpOptions.Default().WithUnionExternalTag().WithUnionNamedFields()
-    "InternalTag", JsonFSharpOptions.Default().WithUnionInternalTag()
-    "InternalTag named fields", JsonFSharpOptions.Default().WithUnionInternalTag().WithUnionNamedFields()
-    "Untagged", JsonFSharpOptions.Default().WithUnionUntagged()
-    "Unwrap fieldless tags", JsonFSharpOptions.Default().WithUnionUnwrapFieldlessTags()
-    "Unwrap single field cases", JsonFSharpOptions.Default().WithUnionUnwrapSingleFieldCases()
-    "Unwrap record cases", JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionUnwrapRecordCases()
-    "Tag naming policy", JsonFSharpOptions.Default().WithUnionTagNamingPolicy(JsonNamingPolicy.CamelCase)
-    "Field naming policy",
-    JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionFieldNamingPolicy(JsonNamingPolicy.SnakeCaseLower)
-    "Field names from types", JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionFieldNamesFromTypes()
-    "Map as array of pairs", JsonFSharpOptions.Default().WithMapFormat(MapFormat.ArrayOfPairs)
-  ]
+  dict
+    [
+      "Default", JsonFSharpOptions.Default()
+      "NewtonsoftLike", JsonFSharpOptions.NewtonsoftLike()
+      "ThothLike", JsonFSharpOptions.ThothLike()
+      "FSharpLuLike", JsonFSharpOptions.FSharpLuLike()
+      "AdjacentTag named fields", JsonFSharpOptions.Default().WithUnionNamedFields()
+      "ExternalTag", JsonFSharpOptions.Default().WithUnionExternalTag()
+      "ExternalTag named fields", JsonFSharpOptions.Default().WithUnionExternalTag().WithUnionNamedFields()
+      "InternalTag", JsonFSharpOptions.Default().WithUnionInternalTag()
+      "InternalTag named fields", JsonFSharpOptions.Default().WithUnionInternalTag().WithUnionNamedFields()
+      "Untagged", JsonFSharpOptions.Default().WithUnionUntagged()
+      "Unwrap fieldless tags", JsonFSharpOptions.Default().WithUnionUnwrapFieldlessTags()
+      "Unwrap single field cases", JsonFSharpOptions.Default().WithUnionUnwrapSingleFieldCases()
+      "Unwrap record cases", JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionUnwrapRecordCases()
+      "Tag naming policy", JsonFSharpOptions.Default().WithUnionTagNamingPolicy(JsonNamingPolicy.CamelCase)
+      "Field naming policy",
+      JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionFieldNamingPolicy(JsonNamingPolicy.SnakeCaseLower)
+      "Field names from types", JsonFSharpOptions.Default().WithUnionNamedFields().WithUnionFieldNamesFromTypes()
+      "Map as array of pairs", JsonFSharpOptions.Default().WithMapFormat(MapFormat.ArrayOfPairs)
+      "Map as object", JsonFSharpOptions.Default().WithMapFormat(MapFormat.Object)
+    ]
 
 type Api =
   {
@@ -152,33 +184,25 @@ type Api =
 
 let createApiFor<'T> (fsharpOptions: JsonFSharpOptions) (sample: 'T) =
   task {
-    let builder = WebApplication.CreateSlimBuilder()
-    builder.WebHost.UseTestServer() |> ignore
+    use! app =
+      startWith
+        (fun services ->
+          services.ConfigureHttpJsonOptions(fun o -> fsharpOptions.AddToJsonSerializerOptions o.SerializerOptions)
+          |> ignore
 
-    builder.Services.ConfigureHttpJsonOptions(fun o -> fsharpOptions.AddToJsonSerializerOptions o.SerializerOptions)
-    |> ignore
+          services.AddOpenApi(fun o -> o.AddFSharp fsharpOptions |> ignore) |> ignore)
+        (fun app ->
+          app.MapOpenApi() |> ignore
+          app.MapGet("/sample", Func<'T>(fun () -> sample)) |> ignore)
 
-    builder.Services.AddOpenApi(fun o -> o.AddFSharp fsharpOptions |> ignore)
-    |> ignore
+    let! text =
+      app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
 
-    let app = builder.Build()
-    app.MapOpenApi() |> ignore
-    app.MapGet("/sample", Func<'T>(fun () -> sample)) |> ignore
-
-    try
-      do! app.StartAsync()
-      let! text = app.GetTestClient().GetStringAsync "/openapi/v1.json"
-
-      let serializer =
-        app.Services.GetRequiredService<IOptions<JsonOptions>>().Value.SerializerOptions
-
-      return
-        {
-          Document = JsonNode.Parse text |> Option.ofObj |> Option.get
-          Serializer = serializer
-        }
-    finally
-      (app :> IAsyncDisposable).DisposeAsync().AsTask().Wait()
+    return
+      {
+        Document = JsonNode.Parse text |> Option.ofObj |> Option.get
+        Serializer = app.Services.GetRequiredService<IOptions<JsonOptions>>().Value.SerializerOptions
+      }
   }
 
 let createApi fsharpOptions = createApiFor fsharpOptions samples.Head
@@ -213,96 +237,142 @@ let validate (schema: JsonSchema) (json: string) =
 
   results.IsValid, failures
 
-let encodingTests =
-  encodings
-  |> List.map (fun (name, fsharpOptions) ->
-    testTask name {
-      let! api = createApi fsharpOptions
-      let schema = responseSchema api
+let encodingNames = TheoryData<string>(encodings.Keys)
 
-      for sample in samples do
-        let json = JsonSerializer.Serialize(sample, api.Serializer)
-        let valid, details = validate schema json
-        Expect.isTrue valid $"Serialized sample does not match the schema.\nJSON: {json}\nErrors: {details}"
+[<Theory>]
+[<MemberData(nameof encodingNames)>]
+let ``serialized values match the schema for every encoding`` (encoding: string) =
+  task {
+    let! api = createApi encodings[encoding]
+    let schema = responseSchema api
 
-      for KeyValue(id, definition) in componentSchemas api do
-        Expect.isGreaterThan (definition.AsObject().Count) 0 $"Component '{id}' is an empty schema"
-    })
+    for sample in samples do
+      let json = JsonSerializer.Serialize(sample, api.Serializer)
+      let valid, details = validate schema json
+      Assert.True(valid, $"Serialized sample does not match the schema.\nJSON: {json}\nErrors: {details}")
 
-let defaultEncodingTests =
-  testList
-    "Default encoding"
-    [
-      testTask "rejects JSON that does not match the F# types" {
-        let! api = createApi (JsonFSharpOptions.Default())
-        let schema = responseSchema api
-        let json = JsonSerializer.SerializeToNode(samples.Head, api.Serializer).AsObject()
+    for KeyValue(id, definition) in componentSchemas api do
+      Assert.True(definition.AsObject().Count > 0, $"Component '{id}' is an empty schema")
+  }
 
-        let mutate (change: JsonObject -> unit) =
-          let copy = json.DeepClone().AsObject()
-          change copy
-          copy.ToJsonString()
+[<Fact>]
+let ``rejects JSON that does not match the F# types`` () =
+  task {
+    let! api = createApi (JsonFSharpOptions.Default())
+    let schema = responseSchema api
+    let json = JsonSerializer.SerializeToNode(samples.Head, api.Serializer).AsObject()
 
-        let invalid =
-          [
-            "unknown union case", mutate (fun o -> o["kind"] <- JsonNode.Parse """{"Case":"C"}""")
-            "missing required field", mutate (fun o -> o.Remove "name" |> ignore)
-            "wrong field type", mutate (fun o -> o["tags"] <- JsonValue.Create 1)
-            "unwrapped single-case union", mutate (fun o -> o["mail"] <- JsonNode.Parse """{"Case":"Email"}""")
-            "wrong union fields", mutate (fun o -> o["value"] <- JsonNode.Parse """{"Case":"ANumber","Fields":["x"]}""")
-          ]
+    let mutate (change: JsonObject -> unit) =
+      let copy = json.DeepClone().AsObject()
+      change copy
+      copy.ToJsonString()
 
-        for case, text in invalid do
-          let valid, _ = validate schema text
-          Expect.isFalse valid $"Expected '{case}' to be rejected: {text}"
+    let invalid =
+      [
+        "unknown union case", mutate (fun o -> o["kind"] <- JsonNode.Parse """{"Case":"C"}""")
+        "missing required field", mutate (fun o -> o.Remove "name" |> ignore)
+        "wrong field type", mutate (fun o -> o["tags"] <- JsonValue.Create 1)
+        "unwrapped single-case union", mutate (fun o -> o["mail"] <- JsonNode.Parse """{"Case":"Email"}""")
+        "wrong union fields", mutate (fun o -> o["value"] <- JsonNode.Parse """{"Case":"ANumber","Fields":["x"]}""")
+      ]
+
+    for case, text in invalid do
+      let valid, _ = validate schema text
+      Assert.False(valid, $"Expected '{case}' to be rejected: {text}")
+  }
+
+[<Fact>]
+let ``marks option fields optional and nullable`` () =
+  task {
+    let! api = createApi (JsonFSharpOptions.Default())
+    let sample = (componentSchemas api)["Sample"]
+    let required = sample["required"].AsArray() |> Seq.map string |> Set.ofSeq
+
+    Assert.True(required.Contains "name", "name is required")
+    Assert.False(required.Contains "nick", "an option field is not required")
+    Assert.False(required.Contains "maybe", "a Skippable field is not required")
+    Assert.Equal("""{"type":["null","string"]}""", sample["properties"].["nick"].ToJsonString())
+  }
+
+[<Fact>]
+let ``names record fields the way they are serialized`` () =
+  task {
+    let! api = createApi (JsonFSharpOptions.Default())
+    let json = JsonSerializer.SerializeToNode(samples.Head, api.Serializer).AsObject()
+    let sample = (componentSchemas api)["Sample"]
+    let properties = sample["properties"].AsObject()
+
+    for name in [ "aka"; "custom" ] do
+      Assert.True(json.ContainsKey name, $"'{name}' is serialized")
+      Assert.True(properties.ContainsKey name, $"'{name}' is described")
+
+    for name in [ "hidden"; "alias"; "original" ] do
+      Assert.False(json.ContainsKey name, $"'{name}' is not serialized")
+      Assert.False(properties.ContainsKey name, $"'{name}' is not described")
+  }
+
+[<Fact>]
+let ``describes maps keyed by single-case unions as objects`` () =
+  task {
+    let sample = Map [ Email "a@b", 1 ]
+    let! api = createApiFor (JsonFSharpOptions.Default()) sample
+    let json = JsonSerializer.Serialize(sample, api.Serializer)
+    let valid, details = validate (responseSchema api) json
+    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.StartsWith("{", json)
+  }
+
+[<Fact>]
+let ``describes single-case unions as their wrapped value`` () =
+  task {
+    let! api = createApi (JsonFSharpOptions.Default())
+    let email = (componentSchemas api)["Email"]
+    Assert.Equal("""{"type":"string"}""", email.ToJsonString())
+  }
+
+[<Fact>]
+let ``describes maps keyed by other unions as arrays of pairs`` () =
+  task {
+    let sample = Map [ UserId 1, "one"; UserId 2, "two" ]
+    let! api = createApiFor (JsonFSharpOptions.Default()) sample
+    let json = JsonSerializer.Serialize(sample, api.Serializer)
+    let valid, details = validate (responseSchema api) json
+    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.StartsWith("[", json)
+
+    let keyedByCase = Map [ Origin, 1; Labeled(1, 2), 2 ]
+    let! api = createApiFor (JsonFSharpOptions.Default()) keyedByCase
+    let json = JsonSerializer.Serialize(keyedByCase, api.Serializer)
+    let valid, details = validate (responseSchema api) json
+    Assert.True(valid, $"JSON: {json}\nErrors: {details}")
+    Assert.StartsWith("[", json)
+  }
+
+[<Fact>]
+let ``AddFSharp without options uses the default encoding`` () =
+  task {
+    let document (configure: OpenApiOptions -> unit) =
+      task {
+        use! app =
+          startWith
+            (fun services ->
+              services.ConfigureHttpJsonOptions(fun o ->
+                JsonFSharpOptions.Default().AddToJsonSerializerOptions o.SerializerOptions)
+              |> ignore
+
+              services.AddOpenApi(configure) |> ignore)
+            (fun app ->
+              app.MapOpenApi() |> ignore
+              app.MapGet("/sample", Func<Sample>(fun () -> samples.Head)) |> ignore)
+
+        return! app.Client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)
       }
 
-      testTask "marks option fields optional and nullable" {
-        let! api = createApi (JsonFSharpOptions.Default())
-        let sample = (componentSchemas api)["Sample"]
-        let required = sample["required"].AsArray() |> Seq.map string |> Set.ofSeq
+    let! withDefaults = document (fun o -> o.AddFSharp() |> ignore)
 
-        Expect.isTrue (required.Contains "name") "name is required"
-        Expect.isFalse (required.Contains "nick") "an option field is not required"
-        Expect.isFalse (required.Contains "maybe") "a Skippable field is not required"
+    let! explicitDefaults =
+      document (fun o -> o.AddFSharp(JsonFSharpOptions.Default()) |> ignore)
 
-        Expect.equal
-          (sample["properties"].["nick"].ToJsonString())
-          """{"type":["null","string"]}"""
-          "an option of string is a nullable string"
-      }
-
-      testTask "names record fields the way they are serialized" {
-        let! api = createApi (JsonFSharpOptions.Default())
-        let json = JsonSerializer.SerializeToNode(samples.Head, api.Serializer).AsObject()
-        let sample = (componentSchemas api)["Sample"]
-        let properties = sample["properties"].AsObject()
-
-        for name in [ "aka"; "custom" ] do
-          Expect.isTrue (json.ContainsKey name) $"'{name}' is serialized"
-          Expect.isTrue (properties.ContainsKey name) $"'{name}' is described"
-
-        for name in [ "hidden"; "alias"; "original" ] do
-          Expect.isFalse (json.ContainsKey name) $"'{name}' is not serialized"
-          Expect.isFalse (properties.ContainsKey name) $"'{name}' is not described"
-      }
-
-      testTask "describes maps keyed by single-case unions as objects" {
-        let sample = Map [ Email "a@b", 1 ]
-        let! api = createApiFor (JsonFSharpOptions.Default()) sample
-        let json = JsonSerializer.Serialize(sample, api.Serializer)
-        let valid, details = validate (responseSchema api) json
-        Expect.isTrue valid $"JSON: {json}\nErrors: {details}"
-        Expect.stringStarts json "{" "serialized as a JSON object"
-      }
-
-      testTask "describes single-case unions as their wrapped value" {
-        let! api = createApi (JsonFSharpOptions.Default())
-        let email = (componentSchemas api)["Email"]
-        Expect.equal (email.ToJsonString()) """{"type":"string"}""" "Email"
-      }
-    ]
-
-[<Tests>]
-let tests =
-  testList "OpenApi" [ testList "encodings" encodingTests; defaultEncodingTests ]
+    Assert.Equal(explicitDefaults, withDefaults)
+    Assert.Contains("\"Sample\"", withDefaults)
+  }

@@ -137,7 +137,7 @@ To reproduce the validation locally, run these commands from the repository root
 dotnet restore FSharp.MinimalApi.sln
 dotnet tool restore
 dotnet build FSharp.MinimalApi.sln --configuration Release --no-restore
-dotnet test FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
+dotnet test --solution FSharp.MinimalApi.sln --configuration Release --no-build --no-restore
 dotnet fantomas check .
 ```
 
@@ -181,3 +181,13 @@ What it describes:
 - **Recursive types** through named components.
 
 Not supported: per-type overrides (`JsonFSharpConverter` attributes or `WithOverrides`) and `IncludeRecordProperties`.
+
+## Development
+
+The tests use xUnit v3 on Microsoft Testing Platform:
+
+```ps
+$ dotnet test
+```
+
+`./fake.sh test` also collects coverage and fails when a library assembly drops below 90% line coverage. `./fake.sh lint` checks formatting.
