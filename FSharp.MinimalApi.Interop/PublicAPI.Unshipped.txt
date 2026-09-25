@@ -1,1 +1,2 @@
 #nullable enable
+static FSharp.MinimalApi.AsParameters.OfValueTask<TParam, TResult>(Microsoft.FSharp.Core.FSharpFunc<TParam, System.Threading.Tasks.ValueTask<TResult>>! requestDelegate) -> System.Delegate!

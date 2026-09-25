@@ -43,8 +43,16 @@ type Bound =
   }
 
 let private greet (req: Bound) =
-  req.calls.Add $"{req.id}"
-  $"{req.tenant}:{req.search}:{req.greeting.Name}{req.greeting.Punctuation}:{req.ctx.Request.Path}:{req.cancellationToken = req.ctx.RequestAborted}"
+  req.calls.Add(sprintf "%d" req.id)
+
+  sprintf
+    "%s:%s:%s%s:%O:%O"
+    req.tenant
+    req.search
+    req.greeting.Name
+    req.greeting.Punctuation
+    req.ctx.Request.Path
+    (req.cancellationToken = req.ctx.RequestAborted)
 
 let private withCalls (routes: EndpointsMap) =
   startWith (fun services -> services.AddSingleton<Calls>() |> ignore) (fun app -> routes.Apply app |> ignore)
@@ -235,7 +243,7 @@ let ``Task and ValueTask handlers receive request cancellation`` () =
 
           started.SetResult req.cancellationToken.CanBeCanceled
           do! Task.Delay(Timeout.Infinite, req.cancellationToken)
-          return Ok "never"
+          return! Task.FromResult(Ok "never")
         }
 
       let routes =

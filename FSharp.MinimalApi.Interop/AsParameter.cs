@@ -81,7 +81,7 @@ public static class AsParameters
                 ? ValueTask ([AsParameters] TParam parameters) => IgnoreResult(requestDelegate.Invoke(parameters))
                 : ValueTask<TResult> ([AsParameters] TParam parameters) => requestDelegate.Invoke(parameters);
 
-    static async ValueTask IgnoreResult<T>(ValueTask<T> value) => await value;
+    static async ValueTask IgnoreResult<T>(ValueTask<T> value) => await value.ConfigureAwait(false);
 
     // A plain Task has no result to unwrap; the delegate returns it as is and ASP.NET awaits it.
     static bool IsTask<T>() =>

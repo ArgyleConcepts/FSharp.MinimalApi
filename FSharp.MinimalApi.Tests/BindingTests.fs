@@ -58,7 +58,7 @@ let private customHandler
   =
   let (ItemId id) = req.itemId
   let (HeaderBound header) = req.headerBound
-  $"{id}:{header}"
+  sprintf "%d:%s" id header
 
 let private routes =
   endpoints {
@@ -173,7 +173,7 @@ let ``option and voption are not inferred as query scalars`` () =
       use! app = serve route
 
       let! error =
-        Assert.ThrowsAsync<InvalidOperationException>(fun () -> get app $"{url}?value=3" :> Task)
+        Assert.ThrowsAsync<InvalidOperationException>(fun () -> get app (url + "?value=3") :> Task)
 
       Assert.Contains("Body was inferred", error.Message)
   }
@@ -184,7 +184,7 @@ let ``binding failures never run the named handler`` () =
     let calls = Calls()
 
     let handler (req: {| id: int; greeting: Greeting |}) =
-      calls.Add $"{req.id}"
+      calls.Add(sprintf "%d" req.id)
       req.greeting.Name
 
     use! app = serve (endpoints { post "/probe/{id}" handler })
