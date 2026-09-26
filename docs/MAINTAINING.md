@@ -35,3 +35,16 @@ Check both pipeline Triggers and organization/project Pipelines Settings if fork
 Keep private vulnerability reporting, Dependabot alerts/security updates, secret scanning, and push protection enabled. Triage security reports through private advisories. Dependency update PRs target `develop` and follow the same CI and review rules as other changes.
 
 The upstream MIT notice must remain intact. Publishing packages requires a separate release decision and the package verification described in the README. Do not add release secrets to the PR pipeline.
+
+## Preparing and publishing a beta
+
+`Directory.Build.props` is the package-version authority; the historical `GitVersion.yml` is not used by PR validation or local packing. For this release, both packages must use `0.3.0-beta.1`.
+
+1. Run the validation commands in the README, including `bash eng/verify-packages.sh`. The package check verifies repository commit metadata, symbol files, and generated SourceLink mappings, then runs a fresh consumer.
+2. Merge the reviewed preparation PR into `develop`, then promote it to `master` through a PR with required Azure validation.
+3. From the clean release commit, pack both projects using the README commands. Inspect the two `.nupkg` and two `.snupkg` files, their beta version, and source links before publishing. Preserve these exact artifacts for the release.
+4. Confirm access to the intended Argyle Concepts NuGet organization and a publishing credential scoped to the two package IDs. Keep credentials outside source control and PR validation.
+5. After the release decision, publish both packages and their symbols to NuGet using the approved release environment. Confirm both NuGet listings show `0.3.0-beta.1` and organization ownership.
+6. Create a GitHub release tagged `0.3.0-beta.1` at the packaged commit, explicitly mark it as a prerelease, and attach the verified artifacts. Describe the .NET 10 requirement, included Interop assembly, optional OpenAPI package, and documented binding/AOT limitations.
+
+Preparation and validation do not publish packages. A stable `0.3.0` release requires a later explicit version change and release decision.
