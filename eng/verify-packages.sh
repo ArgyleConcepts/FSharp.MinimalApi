@@ -80,3 +80,9 @@ mkdir "$consumer_dir"
 cp "$repo_root/eng/PackageSmoke/PackageSmoke.fsproj" "$repo_root/eng/PackageSmoke/Program.fs" "$consumer_dir/"
 dotnet restore "$consumer_dir/PackageSmoke.fsproj" --source "$package_dir" --source https://api.nuget.org/v3/index.json
 dotnet run --project "$consumer_dir/PackageSmoke.fsproj" --configuration Release --no-restore
+
+# Retain only verified release artifacts when requested by the release pipeline.
+if [[ -n "${VERIFY_PACKAGE_OUTPUT_DIRECTORY:-}" ]]; then
+    mkdir -p "$VERIFY_PACKAGE_OUTPUT_DIRECTORY"
+    cp "$package_dir"/*.nupkg "$package_dir"/*.snupkg "$VERIFY_PACKAGE_OUTPUT_DIRECTORY/"
+fi
