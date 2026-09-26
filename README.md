@@ -8,7 +8,7 @@ Easily define your routes in your [ASP.NET Core MinimalAPI](https://learn.micros
 
 ## Getting started
 
-The planned packages are `ArgyleConcepts.FSharp.MinimalApi` and the optional `ArgyleConcepts.FSharp.MinimalApi.OpenApi`, both version `0.3.0`. The Core package includes the Interop assembly, so there is no separate Interop package. Until a release is approved, use project references or the locally packed packages from [Package build and release readiness](#package-build-and-release-readiness).
+The planned packages are `ArgyleConcepts.FSharp.MinimalApi` and the optional `ArgyleConcepts.FSharp.MinimalApi.OpenApi`, both version `0.3.0-beta.1`. The Core package includes the Interop assembly, so there is no separate Interop package. Until a release is approved, use project references or the locally packed packages from [Package build and release readiness](#package-build-and-release-readiness).
 
 See the complete [BasicApi sample](BasicApi/Program.fs).
 
@@ -207,7 +207,7 @@ The assemblies now carry nullness metadata. Projects that do not enable nullness
 
 ## Package build and release readiness
 
-`Directory.Build.props` sets the shared `0.3.0` package version and the `FSharp.Core` 10.0.100 minimum used by every project. The Core package contains both `FSharp.MinimalApi.dll` and its implementation-only `FSharp.MinimalApi.Interop.dll`; the OpenAPI package is separate. Both include the README and the original MIT LICENSE. The package project and repository URLs point to this fork, while the README credits Lucas Teles and links to the upstream project.
+`Directory.Build.props` sets the shared `0.3.0-beta.1` package version and the `FSharp.Core` 10.0.100 minimum used by every project. The Core package contains both `FSharp.MinimalApi.dll` and its implementation-only `FSharp.MinimalApi.Interop.dll`; the OpenAPI package is separate. Both include the README and the original MIT LICENSE. The package project and repository URLs point to this fork, while the README credits Lucas Teles and links to the upstream project.
 
 Run `bash eng/verify-packages.sh` to pack both packages into a temporary local directory, inspect their metadata and contents, then restore and run a small F# app against those packages. The temporary files are deleted when the check finishes. To retain packages for inspection, run:
 
