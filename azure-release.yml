@@ -71,7 +71,7 @@ stages:
                         version: 10.0.x
                     - bash: |
                         set -euo pipefail
-                        if [[ -z "$NUGET_API_KEY" || "$NUGET_API_KEY" == '$(NUGET_API_KEY)' ]]; then
+                        if [[ -z "${NUGET_API_KEY:-}" ]]; then
                           echo "Missing release-only NuGet API key." >&2
                           exit 1
                         fi
