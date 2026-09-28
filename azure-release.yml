@@ -52,7 +52,7 @@ stages:
   - ${{ if eq(parameters.publishPackages, true) }}:
       - stage: Publish
         dependsOn: Validate
-        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['Build.Reason'], 'Manual'))
+        condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['Build.SourceBranch'], 'refs/heads/master')))
         jobs:
           - deployment: NuGet
             environment: fsharp-minimalapi-nuget
@@ -75,6 +75,31 @@ stages:
                           echo "Missing release-only NuGet API key." >&2
                           exit 1
                         fi
+                        # Betas come from develop; stable releases come from master.
+                        shopt -s nullglob
+                        packages=("$PACKAGE_DIRECTORY"/*.nupkg)
+                        if [[ ${#packages[@]} -ne 2 ]]; then
+                          echo "Expected exactly two release packages." >&2
+                          exit 1
+                        fi
+                        for package in "${packages[@]}"; do
+                          filename="${package##*/}"
+                          case "$SOURCE_BRANCH" in
+                            refs/heads/develop)
+                              if [[ ! "$filename" =~ ^ArgyleConcepts\.FSharp\.MinimalApi(\.OpenApi)?\.[0-9]+\.[0-9]+\.[0-9]+-[A-Za-z0-9.-]+\.nupkg$ ]]; then
+                                echo "Only prerelease packages can publish from develop: $filename" >&2
+                                exit 1
+                              fi
+                              ;;
+                            refs/heads/master)
+                              if [[ ! "$filename" =~ ^ArgyleConcepts\.FSharp\.MinimalApi(\.OpenApi)?\.[0-9]+\.[0-9]+\.[0-9]+\.nupkg$ ]]; then
+                                echo "Only stable packages can publish from master: $filename" >&2
+                                exit 1
+                              fi
+                              ;;
+                            *) echo "Publishing is restricted to develop and master." >&2; exit 1 ;;
+                          esac
+                        done
                         for package in "$PACKAGE_DIRECTORY"/*.nupkg; do
                           dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
                         done
@@ -86,3 +111,4 @@ stages:
                       env:
                         NUGET_API_KEY: $(NUGET_API_KEY)
                         PACKAGE_DIRECTORY: $(Pipeline.Workspace)/packages
+                        SOURCE_BRANCH: $(Build.SourceBranch)
