@@ -38,14 +38,16 @@ The upstream MIT notice must remain intact. Publishing packages requires a separ
 
 ## Preparing and publishing a beta
 
-`Directory.Build.props` is the package-version authority; the historical `GitVersion.yml` is not used by PR validation or local packing. For this release, both packages must use `0.3.0-beta.1`.
+The `0.3.0-beta.1` beta was published on September 28, 2026. Both packages are available on NuGet, and the [GitHub prerelease](https://github.com/ArgyleConcepts/FSharp.MinimalApi/releases/tag/0.3.0-beta.1) contains both package and symbol pairs. Use the procedure below for future beta releases after selecting a new version.
+
+`Directory.Build.props` is the package-version authority; the historical `GitVersion.yml` is not used by PR validation or local packing. It currently selects `0.3.0-beta.1`. For a subsequent release, update the shared version so both packages use the selected version.
 
 1. Run the validation commands in the README, including `bash eng/verify-packages.sh`. The package check verifies repository commit metadata, symbol files, and generated SourceLink mappings, then runs a fresh consumer.
 2. Merge the reviewed preparation PR into `develop`. Publish the beta from that commit; promote to `master` through a separate reviewed PR when preparing a stable release.
 3. Run the release pipeline in validation-only mode on the clean `develop` commit. Inspect the two `.nupkg` and two `.snupkg` files, their beta version, and source links in its retained `packages` artifact. A publishing run rebuilds and verifies packages from the same branch commit before pushing them.
 4. Confirm access to the intended Argyle Concepts NuGet organization and a publishing credential scoped to the two package IDs. Keep credentials outside source control and PR validation.
-5. After the release decision, publish both packages and their symbols to NuGet using the approved release environment. Confirm both NuGet listings show `0.3.0-beta.1` and organization ownership.
-6. Create a GitHub release tagged `0.3.0-beta.1` at the packaged commit, explicitly mark it as a prerelease, and attach the verified artifacts. Describe the .NET 10 requirement, included Interop assembly, optional OpenAPI package, and documented binding/AOT limitations.
+5. After the release decision, publish both packages and their symbols to NuGet using the approved release environment. Confirm both NuGet listings show the selected version and organization ownership.
+6. Create a GitHub release tagged with the selected version at the packaged commit, explicitly mark it as a prerelease, and attach the verified artifacts. Describe the .NET 10 requirement, included Interop assembly, optional OpenAPI package, and documented binding/AOT limitations.
 
 Preparation and validation do not publish packages. A stable `0.3.0` release requires a later explicit version change and release decision.
 
