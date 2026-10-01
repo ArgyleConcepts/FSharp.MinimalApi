@@ -2,13 +2,25 @@
 
 This is the Argyle Concepts maintained .NET 10 fork of [FSharp.MinimalApi](https://github.com/lucasteles/FSharp.MinimalApi), originally created by Lucas Teles. The original MIT copyright and permission notice are retained in [LICENSE](LICENSE). This fork's source, issues, and pull requests live in [ArgyleConcepts/FSharp.MinimalApi](https://github.com/ArgyleConcepts/FSharp.MinimalApi).
 
-The Argyle packages are being prepared locally and have **not been published**.
+The Argyle packages are available on NuGet as version **0.3.0-beta.1**. See the [beta release](https://github.com/ArgyleConcepts/FSharp.MinimalApi/releases/tag/0.3.0-beta.1) for release notes and package artifacts.
 
 Easily define your routes in your [ASP.NET Core MinimalAPI](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis) with [`TypedResults`](https://learn.microsoft.com/en-us/aspnet/core/release-notes/aspnetcore-7.0?view=aspnetcore-7.0#typed-results-for-minimal-apis) support
 
 ## Getting started
 
-The planned packages are `ArgyleConcepts.FSharp.MinimalApi` and the optional `ArgyleConcepts.FSharp.MinimalApi.OpenApi`, both version `0.3.0-beta.1`. The Core package includes the Interop assembly, so there is no separate Interop package. Until a release is approved, use project references or the locally packed packages from [Package build and release readiness](#package-build-and-release-readiness).
+Install the [Core package](https://www.nuget.org/packages/ArgyleConcepts.FSharp.MinimalApi/0.3.0-beta.1) in a .NET 10 application:
+
+```sh
+dotnet add package ArgyleConcepts.FSharp.MinimalApi --version 0.3.0-beta.1
+```
+
+For F# schema support, also install the optional [OpenAPI package](https://www.nuget.org/packages/ArgyleConcepts.FSharp.MinimalApi.OpenApi/0.3.0-beta.1):
+
+```sh
+dotnet add package ArgyleConcepts.FSharp.MinimalApi.OpenApi --version 0.3.0-beta.1
+```
+
+The Core package includes the Interop assembly, so there is no separate Interop package. For local development, use project references or the locally packed packages from [Package build and release readiness](#package-build-and-release-readiness).
 
 See the complete [BasicApi sample](BasicApi/Program.fs).
 
@@ -216,7 +228,7 @@ dotnet pack FSharp.MinimalApi/FSharp.MinimalApi.fsproj --configuration Release -
 dotnet pack FSharp.MinimalApi.OpenApi/FSharp.MinimalApi.OpenApi.fsproj --configuration Release --output artifacts/packages
 ```
 
-The intended NuGet owner is an Argyle Concepts organization account. The Argyle packages have not been published. Before any release, review the two `.nupkg` and `.snupkg` files, confirm the version and source links, rerun the validation commands above, set up organization ownership and publishing credentials outside this repository, and make a separate release decision. The PR pipeline has no publishing step or credentials.
+Both packages are published on NuGet as `0.3.0-beta.1`, with package and symbol artifacts attached to the [GitHub prerelease](https://github.com/ArgyleConcepts/FSharp.MinimalApi/releases/tag/0.3.0-beta.1). Before a subsequent release, review the two `.nupkg` and `.snupkg` files, confirm the version and source links, rerun the validation commands above, verify organization ownership and publishing credentials outside this repository, and make a separate release decision. The PR pipeline has no publishing step or credentials.
 
 ## Modern endpoint mappings and policies
 
@@ -251,7 +263,7 @@ The validation generator must discover the endpoint's model in the assembly wher
 
 `FSharp.MinimalApi.OpenApi` makes [Microsoft.AspNetCore.OpenApi](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/overview) describe F# types the way [FSharp.SystemTextJson](https://github.com/Tarmil/FSharp.SystemTextJson) serializes them. Without it, records, unions, options and F# collections appear as empty schemas, because FSharp.SystemTextJson's converters hide their structure from the generator.
 
-Its planned package ID is `ArgyleConcepts.FSharp.MinimalApi.OpenApi`.
+Its package ID is `ArgyleConcepts.FSharp.MinimalApi.OpenApi`.
 
 Pass the same `JsonFSharpOptions` you use for serialization:
 
